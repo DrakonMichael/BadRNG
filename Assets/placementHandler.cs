@@ -8,11 +8,20 @@ public class placementHandler : NetworkBehaviour
 {
     
     public Material selectionMaterial;
+    public Material placementMaterial;
+    public worldManager placementDestination;
 
     private List<GameObject> tiles;
     private GameObject selector;
     private Plane gridPlane;
     private GameObject selectedTile;
+
+    private GameObject focusedTile;
+    private List<GameObject> focusSelectorVisual;
+
+    private bool dragging = false;
+    private float draggingThreshhold = 0.2f;
+    private float draggingDebounce = 0.0f;
 
     private void Start()
     {
@@ -22,6 +31,7 @@ public class placementHandler : NetworkBehaviour
 
     public void reloadObjectList()
     {
+        focusSelectorVisual = new List<GameObject>();
         tiles = new List<GameObject>();
         foreach (placeableObjectManifest manifest in Resources.LoadAll<placeableObjectManifest>("CreatorAssets"))
         {
@@ -42,20 +52,65 @@ public class placementHandler : NetworkBehaviour
 
     public void loadNewSelector()
     {
+        clearFocusTile();
         if(selector != null) { Destroy(selector); }
         if(selectedTile == null) { return; }
         
         selector = GameObject.Instantiate(selectedTile, new Vector3(0, -10, 0), Quaternion.Euler(0, 0, 0));
         foreach (Renderer r in selector.GetComponentsInChildren<Renderer>())
         {
-            r.material = selectionMaterial;
+            r.material = placementMaterial;
         }
         
     }
 
+    private void clearFocusTile()
+    {
+        if (focusSelectorVisual.Count != 0)
+        {
+            foreach (GameObject o in focusSelectorVisual)
+            {
+                Destroy(o);
+            }
+        }
+        focusSelectorVisual = new List<GameObject>();
+    }
+
+    private void focusTile(GameObject tile)
+    {
+        clearFocusTile();
+        focusedTile = tile;
+        foreach (Renderer r in focusedTile.GetComponentsInChildren<Renderer>())
+        {
+            GameObject newVisual = Instantiate(r.gameObject, r.transform.position, r.transform.rotation);
+            focusSelectorVisual.Add(newVisual);
+            newVisual.GetComponent<Renderer>().material = selectionMaterial;
+        }
+    }
+
     private void Update()
     {
-        if(selectedTile == null) { return; }
+
+        if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && selectedTile == null)
+        {
+            RaycastHit hit;
+            Ray selectionRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(selectionRay, out hit))
+            {
+                if(hit.transform.GetComponentInChildren<placeableObjectManifest>())
+                {
+                    focusTile(hit.transform.gameObject);
+                }
+            }
+        }
+
+        if(focusedTile && Input.GetKeyDown(KeyCode.Delete))
+        {
+            clearFocusTile();
+            Destroy(focusedTile);
+        }
+
+        if (selectedTile == null) { return; }
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         float enter = 0.0f;
         Vector3 newVector = new Vector3(0,0,0);
@@ -88,7 +143,9 @@ public class placementHandler : NetworkBehaviour
         }
 
 
-        if(Input.GetKeyDown(KeyCode.Escape))
+
+
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
             setSelectedObject(null);
         }
@@ -110,6 +167,7 @@ public class placementHandler : NetworkBehaviour
         if (isServer)
         {
             GameObject instantiatedTile = GameObject.Instantiate(selectedTile, location, orientation);
+            instantiatedTile.transform.SetParent(placementDestination.transform);
             NetworkServer.Spawn(instantiatedTile);
         }
     }

@@ -94,6 +94,7 @@ GameObject:
   - component: {fileID: 4793920874023337695}
   - component: {fileID: 7871581881876092393}
   - component: {fileID: 8711393610446113220}
+  - component: {fileID: 8060556100457385089}
   m_Layer: 0
   m_Name: WallTile_1
   m_TagString: Untagged
@@ -148,3 +149,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tileDisplayName: Dungeon Wall Tile 1
   objectType: 1
+--- !u!65 &8060556100457385089
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5317833128445600869}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Size: {x: 0.07732177, y: 0.96307945, z: 1}
+  m_Center: {x: 0.46133912, y: 0.4793669, z: 0}
