@@ -132,7 +132,12 @@ public class placementHandler : NetworkBehaviour
             {
                 if(tileType == placeableObjectType.fullTile)
                 {
-                    placeSelectedTile(newVector, Quaternion.Euler(0, 0, 0));
+                    float turns = 0f;
+                    if(selectedTile.GetComponent<placeableObjectManifest>().rotationAgnostic)
+                    {
+                        turns = Mathf.Floor(Random.Range(0, 4)) * 90f;
+                    }
+                    placeSelectedTile(newVector, Quaternion.Euler(0, turns, 0)); ;
                 } else
                 {
                     placeSelectedTile(newVector, Quaternion.Euler(0, angle-90, 0));

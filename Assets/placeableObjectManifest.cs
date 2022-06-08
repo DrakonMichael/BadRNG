@@ -12,4 +12,5 @@ public class placeableObjectManifest : MonoBehaviour
 {
     public string tileDisplayName;
     public placeableObjectType objectType;
+    public bool rotationAgnostic;
 }
