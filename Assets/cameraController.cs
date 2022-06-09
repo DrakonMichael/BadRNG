@@ -74,6 +74,10 @@ public class cameraController : MonoBehaviour
         if(Camera.main.orthographic)
         {
             Camera.main.orthographicSize += -Input.mouseScrollDelta.y * orthographicScrollSpeed;
+            if(Camera.main.orthographicSize < 0.5f)
+            {
+                Camera.main.orthographicSize = 0.5f;
+            }
         }
 
 
