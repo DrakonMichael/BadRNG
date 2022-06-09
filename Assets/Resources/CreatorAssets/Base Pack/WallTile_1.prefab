@@ -149,6 +149,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tileDisplayName: Dungeon Wall Tile 1
   objectType: 1
+  rotationAgnostic: 0
+  assetID: base_wt_1
+  sourceLocation: 1
+  sourceData: 
 --- !u!65 &8060556100457385089
 BoxCollider:
   m_ObjectHideFlags: 0

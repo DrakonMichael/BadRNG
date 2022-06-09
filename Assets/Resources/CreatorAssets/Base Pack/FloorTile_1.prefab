@@ -150,6 +150,9 @@ MonoBehaviour:
   tileDisplayName: Dungeon Floor Tile 1
   objectType: 0
   rotationAgnostic: 1
+  assetID: base_ft_1
+  sourceLocation: 0
+  sourceData: 
 --- !u!65 &2776423039866401635
 BoxCollider:
   m_ObjectHideFlags: 0

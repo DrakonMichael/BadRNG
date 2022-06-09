@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 
 public class placementHandler : NetworkBehaviour
 {
-    
+   
     public Material selectionMaterial;
     public Material placementMaterial;
     public worldManager placementDestination;
@@ -88,59 +88,73 @@ public class placementHandler : NetworkBehaviour
         }
     }
 
-    private void Update()
+    void handleObjectSelection()
     {
-
         if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && selectedTile == null)
         {
             RaycastHit hit;
             Ray selectionRay = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(selectionRay, out hit))
             {
-                if(hit.transform.GetComponentInChildren<placeableObjectManifest>())
+                if (hit.transform.GetComponentInChildren<placeableObjectManifest>())
                 {
                     focusTile(hit.transform.gameObject);
                 }
             }
         }
 
-        if(focusedTile && Input.GetKeyDown(KeyCode.Delete))
+        if (focusedTile && Input.GetKeyDown(KeyCode.Delete))
         {
             clearFocusTile();
             Destroy(focusedTile);
         }
+    }
 
-        if (selectedTile == null) { return; }
+    private void Update()
+    {
+        // If no tile is slated for placement, handle selecting objects instead
+        if (selectedTile == null) { handleObjectSelection(); return; }
+
+        // Create ray from camera to mouse
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        float enter = 0.0f;
-        Vector3 newVector = new Vector3(0,0,0);
+        float enter;
 
+        // If ray intersects building grid..
         if (gridPlane.Raycast(ray, out enter))
         {
-
+            // Where in world space the ray hits the grid
             Vector3 hitLocation = ray.GetPoint(enter);
-            newVector = new Vector3(Mathf.Ceil(hitLocation.x) - 0.5f, 0.05f, Mathf.Ceil(hitLocation.z) - 0.5f);
+
+            // Center of the grid tile where the ray hit
+            Vector3 tileCenter = new Vector3(Mathf.Ceil(hitLocation.x) - 0.5f, 0.05f, Mathf.Ceil(hitLocation.z) - 0.5f);
+
+            // Vector from the center of the tile to where the ray actually hit.
+            Vector3 cornerVector = hitLocation - tileCenter;
+
+            //Angle which is made between top of tile and mouse pointer
+            float angle = Mathf.Atan2(cornerVector.x, cornerVector.z);
             
-            Vector3 cornerVector = hitLocation - newVector;
-            float angle = Mathf.Round(Mathf.Atan2(cornerVector.x, cornerVector.z)/(Mathf.PI / 2)) * 90;
+            // Angle which WALL tiles must be rotated to line up correctly.
+            float rotationAngle = Mathf.Round(angle / (Mathf.PI / 2)) * 90;
 
             placeableObjectType tileType = selectedTile.GetComponent<placeableObjectManifest>().objectType;
+            setIndicatorLocation(tileCenter, rotationAngle, tileType);
 
-            setIndicatorLocation(newVector, angle, tileType);
-
+            // If left mouse button pressed and not hovering over ui element..
             if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
             {
                 if(tileType == placeableObjectType.fullTile)
                 {
                     float turns = 0f;
+                    // Math for if tiles are rotation agnostic
                     if(selectedTile.GetComponent<placeableObjectManifest>().rotationAgnostic)
                     {
                         turns = Mathf.Floor(Random.Range(0, 4)) * 90f;
                     }
-                    placeSelectedTile(newVector, Quaternion.Euler(0, turns, 0)); ;
+                    placeSelectedTile(tileCenter, Quaternion.Euler(0, turns, 0)); ;
                 } else
                 {
-                    placeSelectedTile(newVector, Quaternion.Euler(0, angle-90, 0));
+                    placeSelectedTile(tileCenter, Quaternion.Euler(0, rotationAngle - 90, 0));
                 }
                 
             }
@@ -149,7 +163,7 @@ public class placementHandler : NetworkBehaviour
 
 
 
-
+        // Deselect tile if escape pressed.
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             setSelectedObject(null);
@@ -173,6 +187,7 @@ public class placementHandler : NetworkBehaviour
         {
             GameObject instantiatedTile = GameObject.Instantiate(selectedTile, location, orientation);
             instantiatedTile.transform.SetParent(placementDestination.transform);
+            instantiatedTile.transform.name = instantiatedTile.transform.name.Replace("(Clone)", "").Trim();
             NetworkServer.Spawn(instantiatedTile);
         }
     }
