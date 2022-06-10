@@ -23,8 +23,11 @@ public class placementHandler : NetworkBehaviour
     private float draggingThreshhold = 0.2f;
     private float draggingDebounce = 0.0f;
 
+    private Camera placementCamera;
+
     private void Start()
     {
+        if(!isServer) { return; }
         reloadObjectList();
         gridPlane = new Plane(Vector3.up, 0);
     }
@@ -93,7 +96,7 @@ public class placementHandler : NetworkBehaviour
         if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && selectedTile == null)
         {
             RaycastHit hit;
-            Ray selectionRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Ray selectionRay = placementCamera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(selectionRay, out hit))
             {
                 if (hit.transform.GetComponentInChildren<placeableObjectManifest>())
@@ -112,11 +115,25 @@ public class placementHandler : NetworkBehaviour
 
     private void Update()
     {
+        if(!isServer) { return; }
+
+        if(!placementCamera)
+        {
+            if(GameObject.FindGameObjectWithTag("currentCamera"))
+            {
+                placementCamera = GameObject.FindGameObjectWithTag("currentCamera").GetComponent<Camera>();
+            } else
+            {
+                return;
+            }
+        }
+
+
         // If no tile is slated for placement, handle selecting objects instead
         if (selectedTile == null) { handleObjectSelection(); return; }
 
         // Create ray from camera to mouse
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        Ray ray = placementCamera.ScreenPointToRay(Input.mousePosition);
         float enter;
 
         // If ray intersects building grid..

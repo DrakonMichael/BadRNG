@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using Mirror;
 
-public class placeableObjectListHandler : MonoBehaviour
+public class placeableObjectListHandler : NetworkBehaviour
 {
     public placementHandler placementHandler;
     public GameObject buttonPrefab;
@@ -25,6 +26,7 @@ public class placeableObjectListHandler : MonoBehaviour
 
     private void Start()
     {
+        if (!isServer) { return; }
         populateList();
     }
 }

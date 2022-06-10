@@ -78,7 +78,8 @@ public class worldManager : NetworkBehaviour
 
     private void Update()
     {
-        if(Input.GetKeyDown(KeyCode.C))
+        if (!isServer) { return; }
+        if (Input.GetKeyDown(KeyCode.C))
         {
             string world = serializeWorld();
 

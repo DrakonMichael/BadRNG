@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
-public class cameraController : MonoBehaviour
+public class cameraController : NetworkBehaviour
 {
     public float baseSpeed;
     public float maxSpeed;
@@ -19,15 +20,21 @@ public class cameraController : MonoBehaviour
     private float transitionTime = 0.5f;
     private float FOV = 60f;
 
-
+    public Camera camera;
 
     private void Start()
     {
-        Camera.main.fieldOfView = FOV;
+       if(!isLocalPlayer) {
+            Destroy(camera.gameObject);
+            return; 
+       }
+       camera.fieldOfView = FOV;
+       camera.gameObject.tag = "currentCamera";
     }
 
     private void Update()
     {
+        if(!isLocalPlayer) { return; }
         // Translational movement
         curSpeed = baseSpeed;
         if(Input.GetKey(KeyCode.LeftShift))
@@ -38,7 +45,7 @@ public class cameraController : MonoBehaviour
         }
         curSpeed = Mathf.Clamp(curSpeed + (speedIncreaseOverTime * timeSprintHeld), 0, maxSpeed);
 
-        if(Camera.main.orthographic)
+        if(camera.orthographic)
         {
             curSpeed *= 1.5f;
         }
@@ -57,7 +64,7 @@ public class cameraController : MonoBehaviour
         if(Input.GetMouseButton(1))
         {
             Vector3 delta = (Input.mousePosition - lastMouseLocation) * cameraSensitivity;
-            if (allowInput && !Camera.main.orthographic) {
+            if (allowInput && !camera.orthographic) {
                 transform.eulerAngles = new Vector3(transform.eulerAngles.x - delta.y, transform.eulerAngles.y + delta.x, 0);
             }
             lastMouseLocation = Input.mousePosition;
@@ -71,12 +78,12 @@ public class cameraController : MonoBehaviour
         }
 
         // If camera is orthographic:
-        if(Camera.main.orthographic)
+        if(camera.orthographic)
         {
-            Camera.main.orthographicSize += -Input.mouseScrollDelta.y * orthographicScrollSpeed;
-            if(Camera.main.orthographicSize < 0.5f)
+            camera.orthographicSize += -Input.mouseScrollDelta.y * orthographicScrollSpeed;
+            if(camera.orthographicSize < 0.5f)
             {
-                Camera.main.orthographicSize = 0.5f;
+                camera.orthographicSize = 0.5f;
             }
         }
 
@@ -84,7 +91,7 @@ public class cameraController : MonoBehaviour
         // Other controls
         if(Input.GetKeyDown(KeyCode.J))
         {
-            if(Camera.main.orthographic)
+            if(camera.orthographic)
             {
                 StartCoroutine(transitionToPerspective());
             } else
@@ -96,7 +103,7 @@ public class cameraController : MonoBehaviour
 
     IEnumerator transitionToOrthographic()
     {
-        Camera.main.orthographicSize = 5;
+        camera.orthographicSize = 5;
         allowInput = false;
         float updates = 60;
         float timePerUpdate = transitionTime / updates;
@@ -105,30 +112,30 @@ public class cameraController : MonoBehaviour
         for(int i = 0; i < updates; i++)
         {
             float t = i / updates;
-            Camera.main.fieldOfView = Mathf.Lerp(FOV, 1, t);
+            camera.fieldOfView = Mathf.Lerp(FOV, 1, t);
             transform.eulerAngles = new Vector3(Mathf.LerpAngle(eulerAngles.x, 90, t), Mathf.LerpAngle(eulerAngles.y, 0, t), Mathf.LerpAngle(eulerAngles.z, 0, t));
             transform.position = new Vector3(position.x, Mathf.Lerp(position.y, 125, t), position.z);
             yield return new WaitForSeconds(timePerUpdate);
         }
 
 
-        Camera.main.orthographic = true;
+        camera.orthographic = true;
         transform.rotation = Quaternion.Euler(90, 0, 0);
         allowInput = true;
     }
 
     IEnumerator transitionToPerspective()
     {
-        Camera.main.orthographicSize = 5;
+        camera.orthographicSize = 5;
         allowInput = false;
         float updates = 60;
         float timePerUpdate = transitionTime / updates;
         Vector3 position = transform.position;
-        Camera.main.orthographic = false;
+        camera.orthographic = false;
         for (int i = 0; i < updates; i++)
         {
             float t = i / updates;
-            Camera.main.fieldOfView = Mathf.Lerp(1, FOV, t);
+            camera.fieldOfView = Mathf.Lerp(1, FOV, t);
             transform.position = new Vector3(position.x, Mathf.Lerp(position.y, 10, t), position.z);
             yield return new WaitForSeconds(timePerUpdate);
         }
@@ -140,7 +147,7 @@ public class cameraController : MonoBehaviour
     private Vector3 getKeyMovement()
     {
         Vector3 movement = new Vector3(0, 0, 0);
-        if (!Camera.main.orthographic)
+        if (!camera.orthographic)
         {
             if (Input.GetKey(KeyCode.W))
             {

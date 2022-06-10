@@ -151,7 +151,7 @@ MonoBehaviour:
   objectType: 1
   rotationAgnostic: 0
   assetID: base_wt_1
-  sourceLocation: 1
+  sourceLocation: 0
   sourceData: 
 --- !u!65 &8060556100457385089
 BoxCollider:
