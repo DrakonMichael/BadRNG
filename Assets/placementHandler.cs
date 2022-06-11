@@ -152,10 +152,24 @@ public class placementHandler : NetworkBehaviour
             float angle = Mathf.Atan2(cornerVector.x, cornerVector.z);
             
             // Angle which WALL tiles must be rotated to line up correctly.
-            float rotationAngle = Mathf.Round(angle / (Mathf.PI / 2)) * 90;
+            float wall_rotationAngle = (Mathf.Round(angle / (Mathf.PI / 2)) * 90)-90;
+
+            // Angle which CORNER tiles must be rotated to line up correctly
+            float corner_rotationAngle = (Mathf.Round((angle+(Mathf.PI/4)) / (Mathf.PI / 2)) * 90) - 90;
+            
 
             placeableObjectType tileType = selectedTile.GetComponent<placeableObjectManifest>().objectType;
-            setIndicatorLocation(tileCenter, rotationAngle, tileType);
+            if(tileType == placeableObjectType.fullTile)
+            {
+                setIndicatorLocation(tileCenter, Quaternion.Euler(0, 0, 0));
+            } else if(tileType == placeableObjectType.wallTile)
+            {
+                setIndicatorLocation(tileCenter, Quaternion.Euler(0, wall_rotationAngle, 0));
+            } else if(tileType == placeableObjectType.cornerTile)
+            {
+                setIndicatorLocation(tileCenter, Quaternion.Euler(0, corner_rotationAngle, 0));
+            }
+            
 
             // If left mouse button pressed and not hovering over ui element..
             if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
@@ -169,9 +183,12 @@ public class placementHandler : NetworkBehaviour
                         turns = Mathf.Floor(Random.Range(0, 4)) * 90f;
                     }
                     placeSelectedTile(tileCenter, Quaternion.Euler(0, turns, 0)); ;
-                } else
+                } else if(tileType == placeableObjectType.wallTile)
                 {
-                    placeSelectedTile(tileCenter, Quaternion.Euler(0, rotationAngle - 90, 0));
+                    placeSelectedTile(tileCenter, Quaternion.Euler(0, wall_rotationAngle, 0));
+                } else if (tileType == placeableObjectType.cornerTile)
+                {
+                    placeSelectedTile(tileCenter, Quaternion.Euler(0, corner_rotationAngle, 0));
                 }
                 
             }
@@ -188,14 +205,10 @@ public class placementHandler : NetworkBehaviour
 
     }
 
-    private void setIndicatorLocation(Vector3 location, float angle, placeableObjectType tileType)
+    private void setIndicatorLocation(Vector3 location, Quaternion rotation)
     {
         selector.transform.position = location;
-        if (tileType == placeableObjectType.wallTile)
-        {
-            selector.transform.rotation = Quaternion.Euler(0, angle - 90, 0);
-        } 
-        
+        selector.transform.rotation = rotation;
     }
 
     private void placeSelectedTile(Vector3 location, Quaternion orientation)
