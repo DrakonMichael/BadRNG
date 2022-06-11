@@ -1467,6 +1467,7 @@ MonoBehaviour:
   placementHandler: {fileID: 1079116103}
   buttonPrefab: {fileID: 5260292784738834275, guid: c1fa0df9b1136d546b00e23f83940939,
     type: 3}
+  uiPanel: {fileID: 944026299}
 --- !u!114 &2102176056
 MonoBehaviour:
   m_ObjectHideFlags: 0

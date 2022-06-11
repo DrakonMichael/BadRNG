@@ -9,6 +9,8 @@ public class placeableObjectListHandler : NetworkBehaviour
 {
     public placementHandler placementHandler;
     public GameObject buttonPrefab;
+    public GameObject uiPanel;
+
     public void populateList()
     {
         placementHandler.reloadObjectList();
@@ -26,7 +28,10 @@ public class placeableObjectListHandler : NetworkBehaviour
 
     private void Start()
     {
-        if (!isServer) { return; }
+        if (!isServer) {
+            Destroy(uiPanel);
+            
+            return; }
         populateList();
     }
 }
