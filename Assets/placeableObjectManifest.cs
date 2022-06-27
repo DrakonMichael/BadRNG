@@ -7,7 +7,7 @@ public enum placeableObjectType {
     fullTile,
     wallTile,
     cornerTile,
-    freePlacement
+    prop
 }
 
 [System.Serializable]

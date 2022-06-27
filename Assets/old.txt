@@ -1,0 +1,128 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System;
+using System.Reflection;
+using System.ComponentModel.Design;
+
+public class TEST_serializer : MonoBehaviour
+{
+    public placeableObjectManifest o;
+
+    private class scriptSerializer
+    {
+        public Type scriptType;
+        public List<fieldSerializer> fields;
+    }
+
+    private class fieldSerializer
+    {
+        public string fieldName;
+        public Type fieldType;
+    }
+
+    // creates serializer for component T
+    private scriptSerializer CreateSerializer(Type script)
+    {
+        scriptSerializer serialized = new scriptSerializer();
+        serialized.fields = new List<fieldSerializer>();
+        serialized.scriptType = script;
+        foreach (FieldInfo f in script.GetFields())
+        {
+            foreach (object attr in f.GetCustomAttributes())
+            {
+                if (attr.GetType() == typeof(BRNGPersist))
+                {
+                    // This type is serializable and should be serialized.
+                    fieldSerializer serializedField = new fieldSerializer();
+                    serializedField.fieldType = f.FieldType;
+                    serializedField.fieldName = f.Name;
+                    serialized.fields.Add(serializedField);
+                }
+            }
+        }
+        return serialized;
+    }
+
+
+
+    private string serializeScriptFields(Component c, scriptSerializer s)
+    {
+        string totalString = "";
+        foreach (fieldSerializer fs in s.fields)
+        {
+            
+            string fieldstring = "<";
+            fieldstring += fs.fieldName + "::";
+            fieldstring += fs.fieldType.FullName + "::";
+            fieldstring += c.GetType().GetField(fs.fieldName).GetValue(c).ToString() + ">";
+            totalString += fieldstring + "&&";
+
+            sstest test = new sstest();
+            test.fieldname = fs.fieldName;
+            test.typeName = fs.fieldType.FullName;
+            test.dataString = c.GetType().GetField(fs.fieldName).GetValue(c).ToString();
+
+            Debug.Log(JsonUtility.ToJson(test));
+
+            string e = JsonUtility.ToJson(test);
+            sstest shit = JsonUtility.FromJson<sstest>(e);
+
+
+
+            Type dataType = Type.GetType(shit.typeName);
+            
+        }
+
+        
+        return totalString.Substring(0, totalString.Length-2); // strip tailing &&;
+    }
+
+    [System.Serializable]
+    private class serializedObject {
+        public string properties;
+        public string assetID;
+    }
+
+    [System.Serializable]
+    private class sstest
+    {
+        public string typeName;
+        public string fieldname;
+        public string dataString;
+    }
+
+    private serializedObject serializeObject(placeableObjectManifest placeableObject)
+    {
+        serializedObject serializedobj = new serializedObject();
+        GameObject obj = placeableObject.gameObject;
+        serializedobj.assetID = placeableObject.assetID;
+        foreach (Component comp in obj.GetComponents<Component>())
+        {
+            if (comp is TEST_SerializableObject)
+            {
+                Type t = comp.GetType();
+                scriptSerializer sserializer = CreateSerializer(t);
+                serializedobj.properties += serializeScriptFields(comp, sserializer) + "&&";
+            }
+        }
+        serializedobj.properties = serializedobj.properties.Substring(0, serializedobj.properties.Length - 2);
+        return serializedobj;
+    }
+
+    private void Start()
+    {
+        /*
+        serializedObject obj = serializeObject(o);
+        Debug.Log(JsonUtility.ToJson(obj));
+        */
+        GameObject obj = o.gameObject;
+        foreach (Component comp in obj.GetComponents<Component>())
+        {
+            if (comp is TEST_SerializableObject)
+            {
+                Debug.Log(JsonUtility.ToJson(comp));
+            }
+        }
+    }
+}

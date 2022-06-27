@@ -24,12 +24,12 @@ public class cameraController : NetworkBehaviour
 
     private void Start()
     {
-       if(!isLocalPlayer) {
-            Destroy(camera.gameObject);
-            return; 
-       }
-       camera.fieldOfView = FOV;
-       camera.gameObject.tag = "currentCamera";
+        if (!isLocalPlayer) { return; }
+        camera = Camera.main;
+        camera.transform.SetParent(this.transform);
+        camera.transform.localPosition = Vector3.zero;
+        camera.fieldOfView = FOV;
+        camera.gameObject.tag = "currentCamera";
     }
 
     private void Update()

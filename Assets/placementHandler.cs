@@ -3,18 +3,24 @@ using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
 using UnityEngine.EventSystems;
-
+using DG.Tweening;
 public class placementHandler : NetworkBehaviour
 {
    
     public Material selectionMaterial;
     public Material placementMaterial;
-    public worldManager placementDestination;
+    public worldManager targetWorld;
+    public LayerHandler targetLayer;
+    public GameObject placementGrid;
+
+    [SerializeField] private float tweenTime = 0.2f;
 
     private List<GameObject> tiles;
     private GameObject selector;
     private Plane gridPlane;
     private GameObject selectedTile;
+
+    private int layerVerticalOffset = 0;
 
     private GameObject focusedTile;
     private List<GameObject> focusSelectorVisual;
@@ -30,6 +36,32 @@ public class placementHandler : NetworkBehaviour
         if(!isServer) { return; }
         reloadObjectList();
         gridPlane = new Plane(Vector3.up, 0);
+    }
+
+    // For instant change
+    private void setPlane(LayerHandler layer, int height)
+    {
+        gridPlane = new Plane(Vector3.up, layer.transform.position + new Vector3(0, height, 0));
+        placementGrid.transform.position = layer.transform.position + new Vector3(0, height, 0);
+        placementGrid.transform.GetChild(0).transform.position = layer.transform.position;
+    }
+
+    // For gradual change
+    private void setPlaneTweened(LayerHandler layer, int height)
+    {
+        gridPlane = new Plane(Vector3.up, layer.transform.position + new Vector3(0, height, 0));
+        placementGrid.transform.DOMove(layer.transform.position + new Vector3(0, height, 0), tweenTime);
+        placementGrid.transform.GetChild(0).transform.DOMove(layer.transform.position, tweenTime);
+    }
+
+    public void changeLayerSelection(LayerHandler layer)
+    {
+        if (!isServer) { return; }
+        targetLayer = layer;
+        reloadObjectList();
+        placementGrid.transform.position = layer.transform.position;
+        layerVerticalOffset = 0;
+        setPlane(targetLayer, layerVerticalOffset);
     }
 
     public void reloadObjectList()
@@ -128,6 +160,11 @@ public class placementHandler : NetworkBehaviour
             }
         }
 
+        if(!targetLayer)
+        {
+            targetLayer = targetWorld.getDefaultLayer();
+        }
+
 
         // If no tile is slated for placement, handle selecting objects instead
         if (selectedTile == null) { handleObjectSelection(); return; }
@@ -143,7 +180,7 @@ public class placementHandler : NetworkBehaviour
             Vector3 hitLocation = ray.GetPoint(enter);
 
             // Center of the grid tile where the ray hit
-            Vector3 tileCenter = new Vector3(Mathf.Ceil(hitLocation.x) - 0.5f, 0.05f, Mathf.Ceil(hitLocation.z) - 0.5f);
+            Vector3 tileCenter = new Vector3(Mathf.Ceil(hitLocation.x) - 0.5f, targetLayer.transform.position.y + layerVerticalOffset, Mathf.Ceil(hitLocation.z) - 0.5f);
 
             // Vector from the center of the tile to where the ray actually hit.
             Vector3 cornerVector = hitLocation - tileCenter;
@@ -203,6 +240,18 @@ public class placementHandler : NetworkBehaviour
             setSelectedObject(null);
         }
 
+        if(Input.GetKeyDown(KeyCode.PageUp))
+        {
+            layerVerticalOffset++;
+            setPlaneTweened(targetLayer, layerVerticalOffset);
+        }
+
+        if (Input.GetKeyDown(KeyCode.PageDown))
+        {
+            layerVerticalOffset--;
+            setPlaneTweened(targetLayer, layerVerticalOffset);
+        }
+
     }
 
     private void setIndicatorLocation(Vector3 location, Quaternion rotation)
@@ -216,7 +265,7 @@ public class placementHandler : NetworkBehaviour
         if (isServer)
         {
             GameObject instantiatedTile = GameObject.Instantiate(selectedTile, location, orientation);
-            instantiatedTile.transform.SetParent(placementDestination.transform);
+            instantiatedTile.transform.SetParent(targetLayer.transform);
             instantiatedTile.transform.name = instantiatedTile.transform.name.Replace("(Clone)", "").Trim();
             NetworkServer.Spawn(instantiatedTile);
         }

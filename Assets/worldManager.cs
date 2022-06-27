@@ -7,100 +7,66 @@ using Mirror;
 
 public class worldManager : NetworkBehaviour
 {
-    [System.Serializable]
-    private class SerializedTile {
-        public Vector3 position;
-        public Quaternion orientation;
-        public Vector3 localScale;
+    public SerializationService serializationService;
+    public LayerController layerUIController;
 
-        public string assetID;
-        public SourceType sourceLocation;
-        public string sourceData;
+    public SerializationService.WorldData meta;
 
-        public SerializedTile(placeableObjectManifest m, Transform t) {
-            sourceLocation = m.sourceLocation;
-            sourceData = m.sourceData;
-            assetID = m.assetID;
-            position = t.position;
-            orientation = t.rotation;
-            localScale = t.localScale;
-        }
+    private void Start()
+    {
+        meta = new SerializationService.WorldData();
+        serializationService = this.transform.GetComponent<SerializationService>();
     }
 
-    [System.Serializable]
-    private class SerializedWorld
+    private void SaveFile(string data, string filename)
     {
-        public List<SerializedTile> tiles;
-        public string name = "My world";
-    }
+        string path = "./Assets/Resources/SavedWorlds/" + filename + ".brng";
 
-    public string serializeWorld()
-    {
-        SerializedWorld world = new SerializedWorld();
-        world.tiles = new List<SerializedTile>();
-        foreach(placeableObjectManifest worldObject in transform.GetComponentsInChildren<placeableObjectManifest>())
+        using (var stream = new FileStream(path, FileMode.Truncate))
         {
-            SerializedTile tile = new SerializedTile(worldObject, worldObject.transform);
-            world.tiles.Add(tile);
-        }
-        return JsonUtility.ToJson(world);
-    }
-
-    private SerializedWorld deserealizeWorld(string serealizedString)
-    {
-        return JsonUtility.FromJson<SerializedWorld>(serealizedString);
-    }
-
-    private void placeTileOnGrid(SerializedTile tile)
-    {
-        if (isServer)
-        {
-            foreach (placeableObjectManifest manifest in Resources.LoadAll<placeableObjectManifest>("CreatorAssets"))
+            using (var writer = new StreamWriter(stream))
             {
-                Debug.Log(manifest.assetID);
-                if(manifest.assetID == tile.assetID)
-                {
-                    
-                    placeTile(manifest.gameObject, tile.position, tile.orientation, tile.localScale);
-                }
+                writer.Write(data);
             }
         }
-    }
-
-    private void placeTile(GameObject tileToPlace, Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        GameObject instantiatedTile = GameObject.Instantiate(tileToPlace, position, rotation);
-        instantiatedTile.transform.localScale = scale;
-        instantiatedTile.transform.SetParent(transform);
-        instantiatedTile.transform.name = instantiatedTile.transform.name.Replace("(Clone)", "").Trim();
-        NetworkServer.Spawn(instantiatedTile);
     }
 
     private void Update()
     {
+        
         if (!isServer) { return; }
         if (Input.GetKeyDown(KeyCode.C))
         {
-            string world = serializeWorld();
-
-            string path = "Assets/Resources/SavedWorlds/myworld.json";
-            FileStream stream = new FileStream(path, FileMode.Truncate);
-            StreamWriter writer = new StreamWriter(stream);
-            writer.Write(world);
-            writer.Close();
+                SaveFile(serializationService.serializeWorld(this), "testworld");
         }
 
         if(Input.GetKeyDown(KeyCode.V))
         {
-            string path = "Assets/Resources/SavedWorlds/myworld.json";
-            StreamReader reader = new StreamReader(path);
-            SerializedWorld world = deserealizeWorld(reader.ReadToEnd());
-            reader.Close();
+            StreamReader inputStream = new StreamReader("./Assets/Resources/SavedWorlds/testworld.brng");
 
-            foreach (SerializedTile t in world.tiles)
+            string data = inputStream.ReadToEnd();
+            layerUIController.clearUI();
+            serializationService.DeserializeWorld(data, this);
+            inputStream.Close();
+
+            layerUIController.populateUI();
+        }
+
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            Debug.Log(this.transform.GetComponentsInChildren<LayerHandler>().Length);
+        }
+    }
+
+    public LayerHandler getDefaultLayer()
+    {
+        foreach(LayerHandler layer in transform.GetComponentsInChildren<LayerHandler>())
+        {
+            if(layer.index == meta.startingLayerIndex)
             {
-                placeTileOnGrid(t);
+                return layer;
             }
         }
+        return null;
     }
 }
