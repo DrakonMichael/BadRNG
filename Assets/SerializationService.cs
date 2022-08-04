@@ -158,7 +158,7 @@ public class SerializationService : NetworkBehaviour
         if (!isServer) { return; }
         foreach (SerializedObject serializedObject in childrenToDeserialize)
         {
-            foreach (placeableObjectManifest manifest in Resources.LoadAll<placeableObjectManifest>("CreatorAssets"))
+            foreach (placeableObjectManifest manifest in Resources.LoadAll<placeableObjectManifest>("/"))
             {
                 if (manifest.assetID == serializedObject.assetID)
                 {

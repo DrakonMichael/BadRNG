@@ -12,6 +12,7 @@ public class placementHandler : NetworkBehaviour
     public worldManager targetWorld;
     public LayerHandler targetLayer;
     public GameObject placementGrid;
+    public GameObject runtimeHandle;
 
     [SerializeField] private float tweenTime = 0.2f;
 
@@ -30,12 +31,14 @@ public class placementHandler : NetworkBehaviour
     private float draggingDebounce = 0.0f;
 
     private Camera placementCamera;
+    private List<GameObject> runtimeHandles;
 
     private void Start()
     {
         if(!isServer) { return; }
         reloadObjectList();
         gridPlane = new Plane(Vector3.up, 0);
+        runtimeHandles = new List<GameObject>();
     }
 
     // For instant change
@@ -108,23 +111,47 @@ public class placementHandler : NetworkBehaviour
                 Destroy(o);
             }
         }
+
+        if (runtimeHandles.Count != 0)
+        {
+            foreach (GameObject o in runtimeHandles)
+            {
+                Destroy(o);
+            }
+        }
+
         focusSelectorVisual = new List<GameObject>();
+        runtimeHandles = new List<GameObject>();
     }
+
 
     private void focusTile(GameObject tile)
     {
         clearFocusTile();
         focusedTile = tile;
+
+        GameObject newHandle = Instantiate(runtimeHandle, tile.transform.position, tile.transform.rotation);
+        newHandle.transform.localScale = Vector3.zero;
+        newHandle.GetComponent<RuntimeHandle>().target = tile.transform;
+        runtimeHandles.Add(newHandle);
+
         foreach (Renderer r in focusedTile.GetComponentsInChildren<Renderer>())
         {
             GameObject newVisual = Instantiate(r.gameObject, r.transform.position, r.transform.rotation);
             focusSelectorVisual.Add(newVisual);
             newVisual.GetComponent<Renderer>().material = selectionMaterial;
+            newVisual.transform.SetParent(tile.transform);
         }
     }
 
     void handleObjectSelection()
     {
+        // Deselect tile if escape pressed.
+        if (focusedTile && Input.GetKeyDown(KeyCode.Escape))
+        {
+            clearFocusTile();
+        }
+
         if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && selectedTile == null)
         {
             RaycastHit hit;
@@ -151,13 +178,7 @@ public class placementHandler : NetworkBehaviour
 
         if(!placementCamera)
         {
-            if(GameObject.FindGameObjectWithTag("currentCamera"))
-            {
-                placementCamera = GameObject.FindGameObjectWithTag("currentCamera").GetComponent<Camera>();
-            } else
-            {
-                return;
-            }
+            placementCamera = Camera.main;
         }
 
         if(!targetLayer)
@@ -168,6 +189,8 @@ public class placementHandler : NetworkBehaviour
 
         // If no tile is slated for placement, handle selecting objects instead
         if (selectedTile == null) { handleObjectSelection(); return; }
+
+
 
         // Create ray from camera to mouse
         Ray ray = placementCamera.ScreenPointToRay(Input.mousePosition);
@@ -205,6 +228,9 @@ public class placementHandler : NetworkBehaviour
             } else if(tileType == placeableObjectType.cornerTile)
             {
                 setIndicatorLocation(tileCenter, Quaternion.Euler(0, corner_rotationAngle, 0));
+            } else if(tileType == placeableObjectType.prop)
+            {
+                setIndicatorLocation(hitLocation, Quaternion.Euler(0, 0, 0));
             }
             
 
@@ -226,12 +252,14 @@ public class placementHandler : NetworkBehaviour
                 } else if (tileType == placeableObjectType.cornerTile)
                 {
                     placeSelectedTile(tileCenter, Quaternion.Euler(0, corner_rotationAngle, 0));
+                } else if (tileType == placeableObjectType.prop)
+                {
+                    placeSelectedTile(hitLocation, Quaternion.Euler(0, 0, 0)); ;
                 }
                 
             }
 
         }
-
 
 
         // Deselect tile if escape pressed.
@@ -240,7 +268,9 @@ public class placementHandler : NetworkBehaviour
             setSelectedObject(null);
         }
 
-        if(Input.GetKeyDown(KeyCode.PageUp))
+
+
+        if (Input.GetKeyDown(KeyCode.PageUp))
         {
             layerVerticalOffset++;
             setPlaneTweened(targetLayer, layerVerticalOffset);
