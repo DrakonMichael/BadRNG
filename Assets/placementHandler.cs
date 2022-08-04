@@ -14,6 +14,8 @@ public class placementHandler : NetworkBehaviour
     public GameObject placementGrid;
     public GameObject runtimeHandle;
 
+    public InteractionService interactionService;
+
     [SerializeField] private float tweenTime = 0.2f;
 
     private List<GameObject> tiles;
@@ -135,6 +137,16 @@ public class placementHandler : NetworkBehaviour
         newHandle.GetComponent<RuntimeHandle>().target = tile.transform;
         runtimeHandles.Add(newHandle);
 
+        if(tile.GetComponent<placeableObjectManifest>().objectType != placeableObjectType.prop)
+        {
+            RuntimeHandle h = newHandle.GetComponent<RuntimeHandle>();
+            h.ScaleMode = RuntimeHandleMode.None;
+            h.TranslationMode = RuntimeHandleMode.XYZ;
+            h.RotationMode = RuntimeHandleMode.Y;
+            h.TranslationSnapping = 1;
+            h.RotationSnapping = 90;
+        }
+
         foreach (Renderer r in focusedTile.GetComponentsInChildren<Renderer>())
         {
             GameObject newVisual = Instantiate(r.gameObject, r.transform.position, r.transform.rotation);
@@ -154,15 +166,13 @@ public class placementHandler : NetworkBehaviour
 
         if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject() && selectedTile == null)
         {
-            RaycastHit hit;
             Ray selectionRay = placementCamera.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(selectionRay, out hit))
-            {
+            interactionService.PhysicsRaycast(1, selectionRay, (hit) => {
                 if (hit.transform.GetComponentInChildren<placeableObjectManifest>())
                 {
                     focusTile(hit.transform.gameObject);
                 }
-            }
+            });
         }
 
         if (focusedTile && Input.GetKeyDown(KeyCode.Delete))

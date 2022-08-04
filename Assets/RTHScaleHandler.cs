@@ -2,19 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RTHScaleHandler : MonoBehaviour
+public class RTHScaleHandler : RuntimeAxisHandle
 {
-    public Collider XAxisHandle;
-    public Collider YAxisHandle;
-    public Collider ZAxisHandle;
-
     public LineRenderer XIndicator;
     public LineRenderer YIndicator;
     public LineRenderer ZIndicator;
 
     public RuntimeHandle handleCallback;
 
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     private Camera camera;
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
     private Vector3 manipulationAxis;
     private bool dragging;
 
@@ -37,10 +35,9 @@ public class RTHScaleHandler : MonoBehaviour
         {
             // Create ray from camera to mouse
             Ray ray = camera.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
             int onlyHit = LayerMask.GetMask("RuntimeHandle");
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, onlyHit))
-            {
+
+            handleCallback.interactionService.PhysicsRaycast(2, ray, Mathf.Infinity, onlyHit, (hit) => {
                 foreach (Collider childCollider in XAxisHandle.GetComponentsInChildren<Collider>())
                 {
                     if (childCollider == hit.transform.GetComponent<Collider>())
@@ -82,7 +79,7 @@ public class RTHScaleHandler : MonoBehaviour
                     dragging = true;
                     lastPosition = new Vector3(0, 0, 0);
                 }
-            }
+            });
         }
 
         if (dragging)

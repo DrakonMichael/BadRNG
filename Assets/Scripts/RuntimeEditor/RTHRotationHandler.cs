@@ -2,16 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RTHRotationHandler : MonoBehaviour
+public class RTHRotationHandler : RuntimeAxisHandle
 {
-
-    public Collider XAxisHandle;
-    public Collider YAxisHandle;
-    public Collider ZAxisHandle;
 
     public RuntimeHandle handleCallback;
 
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     private Camera camera;
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
 
     private Vector3 normalAxis;
     private bool dragging;
@@ -39,10 +37,8 @@ public class RTHRotationHandler : MonoBehaviour
         {
             // Create ray from camera to mouse
             Ray ray = camera.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
             int onlyHit = LayerMask.GetMask("RuntimeHandle");
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, onlyHit))
-            {
+            handleCallback.interactionService.PhysicsRaycast(2, ray, Mathf.Infinity, onlyHit, (hit) => {
                 foreach (Collider childCollider in XAxisHandle.GetComponentsInChildren<Collider>())
                 {
                     if (childCollider == hit.transform.GetComponent<Collider>())
@@ -81,7 +77,7 @@ public class RTHRotationHandler : MonoBehaviour
                     dragging = true;
                     lastPosition = 0;
                 }
-            }
+            });
         }
 
         if (dragging)

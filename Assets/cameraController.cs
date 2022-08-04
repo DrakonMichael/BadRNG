@@ -20,7 +20,9 @@ public class cameraController : NetworkBehaviour
     private float transitionTime = 0.5f;
     private float FOV = 60f;
 
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     public Camera camera;
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
 
     private void Start()
     {

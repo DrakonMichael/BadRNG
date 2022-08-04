@@ -1712,6 +1712,10 @@ MonoBehaviour:
   translationHandler: {fileID: 4536475096210068747}
   rotationHandler: {fileID: 4536475096852852377}
   scaleHandler: {fileID: 4536475097414566910}
+  TranslationMode: 7
+  RotationMode: 7
+  ScaleMode: 7
+  interactionService: {fileID: 0}
   target: {fileID: 0}
   scaleFactor: 0.1
 --- !u!1 &4536475097887562885
