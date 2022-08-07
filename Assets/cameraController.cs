@@ -27,6 +27,7 @@ public class cameraController : NetworkBehaviour
     private void Start()
     {
         if (!isLocalPlayer) { return; }
+        this.gameObject.tag = "LocalPlayer";
         camera = Camera.main;
         camera.transform.SetParent(this.transform);
         camera.transform.localPosition = Vector3.zero;

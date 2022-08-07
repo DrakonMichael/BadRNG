@@ -8,6 +8,7 @@ TagManager:
   - Workspace Player Container
   - Network Manager
   - Interaction Service
+  - LocalPlayer
   layers:
   - Default
   - TransparentFX

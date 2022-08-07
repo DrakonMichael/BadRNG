@@ -217,8 +217,6 @@ public class RuntimeHandle : MonoBehaviour
 
         transform.localScale = new Vector3(size, size, size);
 
-        Debug.Log(ScaleMode);
-        Debug.Log(SMode_Stored);
 
         if (TMode_Stored != TranslationMode) { TMode_Stored = TranslationMode; SetHandleMode(translationHandler, TranslationMode); }
         if (RMode_Stored != RotationMode) { RMode_Stored = RotationMode; SetHandleMode(rotationHandler, RotationMode); }
