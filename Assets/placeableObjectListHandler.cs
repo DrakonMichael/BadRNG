@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using Mirror;
 
-public class placeableObjectListHandler : NetworkBehaviour
+public class placeableObjectListHandler : MonoBehaviour
 {
     public placementHandler placementHandler;
     public GameObject buttonPrefab;
@@ -28,10 +27,13 @@ public class placeableObjectListHandler : NetworkBehaviour
 
     private void Start()
     {
-        if (!isServer) {
-            Destroy(uiPanel);
-            
-            return; }
         populateList();
     }
+
+    private void Update()
+    {
+        // We want to resize the content frame to accomodate scrolling for all objects
+        transform.GetComponent<RectTransform>().sizeDelta = new Vector2(0, transform.GetComponent<GridLayoutGroup>().preferredHeight);
+    }
+
 }

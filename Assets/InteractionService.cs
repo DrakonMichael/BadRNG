@@ -4,6 +4,7 @@ using UnityEngine;
 using Mirror;
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 #region Interaction Attributes
 
@@ -20,6 +21,14 @@ public class BRNGInteraction : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Method)]
+public class InteractionDeferExecution : Attribute
+{
+    // This attribute marks that a method should be deferred in execution.
+    // By default, all executions are non-deferred, which means the client which called the method sees the change immediately by calling the execution method themselves.
+    // Adding this tag makes sure the client recieves state updates about the interaction only from the server.
+}
+
+[AttributeUsage(AttributeTargets.Method)]
 public class InteractionSetPermission : Attribute
 {
     /** This attribute sets the permission neccesary to run an interaction. */
@@ -28,6 +37,17 @@ public class InteractionSetPermission : Attribute
     public InteractionSetPermission(PermissionLevel perm_level)
     {
         permissionLevel = perm_level;
+    }
+}
+
+public class BRNGExecutionData
+{
+    public string ExecutionName;
+    public PermissionLevel ExecutionPermissionLevel;
+    public Action<InteractionServerData> functionCallback;
+    public bool canBeRunBy(BRNGPlayerData player)
+    {
+        return player.permissions >= ExecutionPermissionLevel;
     }
 }
 
@@ -50,10 +70,86 @@ public class BRNGInteractionData
 
 #endregion
 
-
+[System.Serializable]
 public class InteractionServerData
 {
+    public GameObject target;
+    Type callingType;
+    MethodBase callingMethod;
 
+    public string[] keys;
+    public string[] values;
+
+    [System.NonSerialized]
+    Dictionary<string, string> fastAccess;
+
+    public InteractionServerData()
+    {
+        MethodBase method = (new System.Diagnostics.StackTrace()).GetFrame(1).GetMethod();
+
+        // Second boolean statement stops this from running on the server.
+        if (method.GetCustomAttribute<BRNGInteraction>() == null && method.DeclaringType.Name != "GeneratedNetworkCode")
+        {
+            Debug.LogWarning("InteractionServerData constructed from non-interaction. This will cause breaking bugs if called to ICExecute. (Called from " + method.Name + " in " + method.DeclaringType.Name + ")");
+        }
+
+        callingMethod = method;
+        callingType = method.DeclaringType;
+
+        keys = new string[0];
+        values = new string[0];
+
+        fastAccess = new Dictionary<string, string>();
+    }
+
+    public void serialize()
+    {
+        int numberOfEntries = fastAccess.Count;
+        keys = new string[numberOfEntries];
+        values = new string[numberOfEntries];
+
+        int i = 0;
+        foreach (KeyValuePair<string, string> entry in fastAccess)
+        {
+            keys[i] = entry.Key;
+            values[i] = entry.Value;
+            i++;
+        }
+    }
+
+    public void deserialize()
+    {
+        fastAccess = new Dictionary<string, string>();
+        for (int i = 0; i < keys.Length; i++)
+        {
+            fastAccess.Add(keys[i], values[i]);
+        }
+    }
+
+    public MethodBase getCallingMethod()
+    {
+        return callingMethod;
+    }
+
+    public Type getCallingType()
+    {
+        return callingType;
+    }
+
+    public void encode(object dataToEncode, string encodeAsKey)
+    {
+        fastAccess.Add(encodeAsKey, JsonUtility.ToJson(dataToEncode));
+    }
+
+    public object decode(string key)
+    {
+        return fastAccess[key];
+    }
+
+    public T decodeAs<T>(string key)
+    {
+        return JsonUtility.FromJson<T>(fastAccess[key]);
+    }
 }
 
 public class InteractionService : NetworkBehaviour
@@ -154,6 +250,36 @@ public class InteractionService : NetworkBehaviour
         return newData;
     }
 
+    private BRNGExecutionData assignExecutionData(BRNGScript script, MethodInfo methodInfo)
+    {
+        BRNGExecutionData newData = new BRNGExecutionData();
+
+        // Get player input controller in case an action needs to be wrapped in a server action call.
+        playerInputController inputController = transform.GetComponent<PlayerService>().getLocalPlayer().GetComponent<playerInputController>();
+
+        newData.ExecutionName = methodInfo.Name;
+        newData.functionCallback = (InteractionServerData exeData) => {
+            object[] parameters = new object[1];
+            parameters[0] = exeData;
+            try
+            {
+                methodInfo.Invoke(script, parameters);
+            } catch (TargetInvocationException e)
+            {
+                Debug.LogError("Method invocation failed for " + methodInfo.Name + ". (" + e.InnerException + ")");
+            }
+        };
+
+        newData.ExecutionPermissionLevel = PermissionLevel.Host;
+        InteractionSetPermission setPermissionAttribute = methodInfo.GetCustomAttribute<InteractionSetPermission>();
+        if (setPermissionAttribute != null)
+        {
+            newData.ExecutionPermissionLevel = setPermissionAttribute.permissionLevel;
+        }
+
+        return newData;
+    }
+
     public List<BRNGInteractionData> GenerateInteractionData(GameObject obj)
     {
         List<BRNGInteractionData> interactionDataList = new List<BRNGInteractionData>();
@@ -176,6 +302,33 @@ public class InteractionService : NetworkBehaviour
         return interactionDataList;
     }
 
+    [Server]
+    public List<BRNGExecutionData> GenerateExecutableData(GameObject obj)
+    {
+        List<BRNGExecutionData> interactionDataList = new List<BRNGExecutionData>();
+        BRNGScript[] scripts = obj.transform.GetComponentsInChildren<BRNGScript>();
+        if (scripts.Length > 0)
+        {
+            foreach (BRNGScript script in scripts)
+            {
+                Type scriptType = script.GetType();
+                foreach (MethodInfo minfo in scriptType.GetMethods())
+                {
+                    if (minfo.GetCustomAttribute<BRNGServerExecutable>() != null)
+                    {
+                        BRNGExecutionData newData = new BRNGExecutionData();
+                        newData.ExecutionName = minfo.Name;
+                        
+                        interactionDataList.Add(assignExecutionData(script, minfo));
+                    }
+
+                }
+            }
+        }
+        return interactionDataList;
+    }
+
+    [Client]
     private void HandleInteractionInteractions()
     {
         Ray ray = localcamera.ScreenPointToRay(Input.mousePosition);
@@ -187,19 +340,12 @@ public class InteractionService : NetworkBehaviour
                 if (interactionDataList.Count > 0)
                 {
                     GameObject localPlayer = GameObject.FindGameObjectWithTag("LocalPlayer");
-                    localPlayer.GetComponent<PlayerNetworkData>().getCurrentPlayerWithCallback((BRNGPlayerData plrData) =>
-                    {
-                        contextMenuLocation.SpawnContextMenu(hit.transform.gameObject.name, interactionDataList, plrData, hit.point);
-                        foreach (BRNGInteractionData idata in interactionDataList)
-                        {
 
-                            if (idata.canBeRunBy(plrData))
-                            {
-                                Debug.Log(idata.InteractionName);
-                            }
-                        }
-                    });
+                    BRNGPlayerData plrData = localPlayer.GetComponent<PlayerNetworkData>().getStalePlayerData();
+                    contextMenuLocation.SpawnContextMenu(hit.transform.gameObject.name, interactionDataList, plrData, hit.point);
+                    
                 }
+                
             });
         }
 
@@ -216,20 +362,67 @@ public class InteractionService : NetworkBehaviour
 
 
 
-
-    public void ICExecute(string methodName, object param1)
+    public void ICExecute(GameObject target, string methodName, InteractionServerData ServerData)
     {
+        ServerData.target = target;
+        MethodBase callingMethod = ServerData.getCallingMethod();
+        Type methodClass = ServerData.getCallingType();
 
-        MethodBase callingMethod = (new System.Diagnostics.StackTrace()).GetFrame(1).GetMethod();
-        BRNGInteraction interactionTag = callingMethod.GetCustomAttribute<BRNGInteraction>();
-        if(interactionTag == null)
+        bool callerFound = false;
+        bool targetFound = false;
+
+        MethodInfo callerMethod = null;
+        MethodInfo targetMethod = null;
+        
+
+        foreach (MethodInfo mInfo in methodClass.GetMethods())
         {
-            Debug.LogError("ICExecute cannot be called from non-interaction methods. (Method does not have BRNGInteraction tag).");
-            return;
+            
+            if(mInfo.Name == callingMethod.Name)
+            {
+                if (mInfo.GetCustomAttribute<BRNGInteraction>() == null)
+                {
+                    Debug.LogError("ICExecute cannot be called from non-interaction methods. (Method does not have BRNGInteraction tag).");
+                    return;
+                }
+
+                callerMethod = mInfo;
+                callerFound = true;
+            }
+
+            // target
+            if (mInfo.Name == methodName)
+            {
+                if(mInfo.GetCustomAttribute<BRNGServerExecutable>() == null) {
+                    Debug.LogError("ICExecute target must be marked as server executable functions (Target method does not have BRNGServerExecutable tag).");
+                    return;
+                }
+                targetMethod = mInfo;
+                targetFound = true;
+            }
         }
 
+        if(targetFound && callerFound)
+        {
+            // Try to execute on the server
+            transform.GetComponent<PlayerService>().getLocalPlayer().transform.GetComponent<playerInputController>().TryServerExecution(methodName, ServerData);
+
+            // Non-deferred execution
+            if(targetMethod.GetCustomAttribute<InteractionDeferExecution>() == null)
+            {
+                object[] parameters = new object[1];
+                parameters[0] = ServerData;
+                targetMethod.Invoke(target.GetComponent(methodClass), parameters);
+            }
 
 
+        } else
+        {
+            if(!targetFound) { Debug.LogError("No method of name " + callingMethod.Name + " detected in " + methodClass.Name + " (Use nameof() or check spelling of the method)."); }
+            if(!callerFound) { Debug.LogError("No method of name " + callingMethod.Name + " detected in " + methodClass.Name + " (Is the method private?)."); }
+        }
+
+        
     }
 
     public void StopAllInteractions()
@@ -253,17 +446,22 @@ public class InteractionService : NetworkBehaviour
                     placeableObjectManifest hitObj = hit.transform.GetComponent<placeableObjectManifest>();
                     if(hitObj && hitObj.objectType == placeableObjectType.fullTile)
                     {
-                        newPosIndicator.SetActive(true);
-                        newPosIndicator.transform.position = hit.point;
-                        if (Input.GetMouseButtonDown(0))
+                        if(newPosIndicator != null)
                         {
-                            Destroy(newPosIndicator);
-                            cb(hit.point);
-                            runLoop = false;
+                            newPosIndicator.SetActive(true);
+                            newPosIndicator.transform.position = hit.point;
+                            if (Input.GetMouseButtonDown(0))
+                            {
+                                Destroy(newPosIndicator);
+                                cb(hit.point);
+
+                                runLoop = false;
+                            }
                         }
                     } else
                     {
-                        newPosIndicator.SetActive(false);
+                        if (newPosIndicator != null)
+                            newPosIndicator.SetActive(false);
                     }
 
                 });

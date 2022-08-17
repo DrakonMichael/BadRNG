@@ -41,4 +41,35 @@ public class playerInputController : NetworkBehaviour
 
 
     }
+
+    public void TryServerExecution(string executionName, InteractionServerData passData) {
+        passData.serialize();
+        CmdTryExecution(executionName, passData);
+    }
+
+    [Command]
+    private void CmdTryExecution(string executionName, InteractionServerData passData)
+    {
+        passData.deserialize();
+
+        GameObject utility = GameObject.FindGameObjectWithTag("Interaction Service");
+        List<BRNGExecutionData> functions = utility.GetComponent<InteractionService>().GenerateExecutableData(passData.target);
+
+        foreach (BRNGExecutionData interaction in functions)
+        {
+            if (interaction.ExecutionName == executionName)
+            {
+                // This is the right interaction, verify it can be executed.
+                BRNGPlayer serverPlayer = utility.GetComponent<PlayerService>().getPlayerByConnection(connectionToClient);
+                if (serverPlayer.playerData.permissions >= interaction.ExecutionPermissionLevel)
+                {
+                    interaction.functionCallback(passData);
+                }
+
+                break;
+            }
+        }
+
+
+    }
 }

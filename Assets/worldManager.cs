@@ -52,10 +52,6 @@ public class worldManager : NetworkBehaviour
             layerUIController.populateUI();
         }
 
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            Debug.Log(this.transform.GetComponentsInChildren<LayerHandler>().Length);
-        }
     }
 
     public LayerHandler getDefaultLayer()

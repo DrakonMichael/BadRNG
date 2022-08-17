@@ -64,6 +64,8 @@ public class ContextMenuSpawner : MonoBehaviour
 
         RemoveContextMenu();
 
+        PlayerNetworkData localplayer = GameObject.FindGameObjectWithTag("LocalPlayer").GetComponent<PlayerNetworkData>();
+
 
         GameObject newContextMenu = GameObject.Instantiate(contextMenuPrefab);
         newContextMenu.transform.SetParent(this.transform);
@@ -78,27 +80,38 @@ public class ContextMenuSpawner : MonoBehaviour
             newMethodGroup.GetComponent<RectTransform>().anchoredPosition = new Vector3(0, -trackedYSize, 0);
             newMethodGroup.transform.Find("GroupName").GetComponent<TextMeshProUGUI>().text = groupName;
             float trackedGroupSize = 15;
+            int spawnedButtons = 0;
 
             foreach(BRNGInteractionData data in dataList)
             {
-                GameObject newButton = GameObject.Instantiate(interactionButtonPrefab);
-                newButton.transform.SetParent(newMethodGroup.transform);
-                newButton.GetComponent<RectTransform>().anchoredPosition = new Vector3(0, -(trackedGroupSize), 0);
-                newButton.transform.GetComponentInChildren<TextMeshProUGUI>().text = data.InteractionName;
-
-                newButton.GetComponent<Button>().onClick.AddListener(() =>
+                if(data.canBeRunBy(localplayer.getStalePlayerData()))
                 {
-                    data.interactionExecutionFunction();
-                    RemoveContextMenu();
-                });
+                    GameObject newButton = GameObject.Instantiate(interactionButtonPrefab);
+                    newButton.transform.SetParent(newMethodGroup.transform);
+                    newButton.GetComponent<RectTransform>().anchoredPosition = new Vector3(0, -(trackedGroupSize), 0);
+                    newButton.transform.GetComponentInChildren<TextMeshProUGUI>().text = data.InteractionName;
 
-                trackedGroupSize += 20;
+                    newButton.GetComponent<Button>().onClick.AddListener(() =>
+                    {
+                        data.interactionExecutionFunction();
+                        RemoveContextMenu();
+                    });
+
+                    trackedGroupSize += 20;
+                    spawnedButtons++;
+                }
             }
 
-            trackedYSize += trackedGroupSize;
-            newMethodGroup.GetComponent<RectTransform>().sizeDelta = new Vector2(150, trackedGroupSize);
-            newMethodGroup.GetComponent<RectTransform>().SetLeft(0);
-            newMethodGroup.GetComponent<RectTransform>().SetRight(0);
+            if (spawnedButtons != 0)
+            {
+                trackedYSize += trackedGroupSize;
+                newMethodGroup.GetComponent<RectTransform>().sizeDelta = new Vector2(150, trackedGroupSize);
+                newMethodGroup.GetComponent<RectTransform>().SetLeft(0);
+                newMethodGroup.GetComponent<RectTransform>().SetRight(0);
+            } else
+            {
+                Destroy(newMethodGroup);
+            }
         }
 
         newContextMenu.GetComponent<RectTransform>().sizeDelta = new Vector2(150, trackedYSize);

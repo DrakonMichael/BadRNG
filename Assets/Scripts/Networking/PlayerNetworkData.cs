@@ -18,6 +18,11 @@ public class PlayerNetworkData : NetworkBehaviour
         TargetSetPlayerData(connectionToClient, p.playerData);
     }
 
+    public BRNGPlayerData getStalePlayerData()
+    {
+        return playerData;
+    }
+
     private void Start()
     {
         playerDataCallbacks = new List<Action<BRNGPlayerData>>();

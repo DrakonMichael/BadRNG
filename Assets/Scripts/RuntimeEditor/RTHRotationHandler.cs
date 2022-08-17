@@ -71,7 +71,6 @@ public class RTHRotationHandler : RuntimeAxisHandle
                     circleRenderer = hit.transform.GetComponent<Renderer>();
                     handleCallback.setStartingRotation(handleCallback.transform.rotation);
                     normalAxis = handleCallback.transform.TransformDirection(normalAxis);
-                    Debug.Log(normalAxis);
 
                     startPointWorldSpace = hit.point;
                     dragging = true;

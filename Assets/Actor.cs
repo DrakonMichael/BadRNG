@@ -67,18 +67,24 @@ public class Actor : BRNGScript
 
 
     [BRNGServerExecutable]
+    [InteractionSetPermission(PermissionLevel.Player)]
+    [InteractionDeferExecution]
     public void MoveServer(InteractionServerData data)
     {
-        //TBD: somehow pass data to server :/
+        Vector3 moveTo = data.decodeAs<Vector3>("position");
+        transform.position = moveTo;
     }
 
     [BRNGInteraction]
     [InteractionSetPermission(PermissionLevel.Player)]
     public void Move()
-    { 
+    {
+        InteractionServerData data = new InteractionServerData();
         interactionService.ICGroundPosition((Vector3 posToMoveTo) =>
         {
-            interactionService.ICExecute(nameof(MoveServer), posToMoveTo);
+            data.encode(posToMoveTo, "position");
+
+            interactionService.ICExecute(this.gameObject, nameof(MoveServer), data);
         });
     }
 
