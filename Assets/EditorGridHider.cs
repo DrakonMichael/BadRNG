@@ -6,6 +6,9 @@ public class EditorGridHider : MonoBehaviour
 {
     public EditorModeController editorController;
     public GameObject grid;
+    [SerializeField]
+    float cameraDistanceToMoveGrid;
+
     void Start()
     {
         editorController.addModeEventListener((string mode) =>
@@ -19,4 +22,5 @@ public class EditorGridHider : MonoBehaviour
             }
         });
     }
+
 }

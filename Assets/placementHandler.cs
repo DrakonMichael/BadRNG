@@ -12,11 +12,23 @@ public class placementHandler : NetworkBehaviour
     public worldManager targetWorld;
     public LayerHandler targetLayer;
     public GameObject placementGrid;
+    public GameObject alignmentGrid;
     public GameObject runtimeHandle;
+    public EditorModeController modeController;
+
+
 
     public InteractionService interactionService;
 
+    [Space]
+    [Header("Grid values")]
     [SerializeField] private float tweenTime = 0.2f;
+
+    private int alignmentGridScale;
+    private int alignmentGridHeightChange;
+    [SerializeField]
+    private float alignmentGridLineWidthMultiplier = 0.005f;
+    private bool alignmentGridLock;
 
     private List<GameObject> tiles;
     private GameObject selector;
@@ -41,6 +53,14 @@ public class placementHandler : NetworkBehaviour
         reloadObjectList();
         gridPlane = new Plane(Vector3.up, 0);
         runtimeHandles = new List<GameObject>();
+
+        modeController.addModeEventListener((string mode) => { 
+            if(mode != "placement")
+            {
+                setSelectedObject(null);
+                clearFocusTile();
+            }
+        });
     }
 
     // For instant change
@@ -187,6 +207,7 @@ public class placementHandler : NetworkBehaviour
     private void Update()
     {
         if(!isServer) { return; }
+        if(modeController.getActiveMode() != "placement") { return; }
 
         if(!placementCamera)
         {
@@ -198,11 +219,85 @@ public class placementHandler : NetworkBehaviour
             targetLayer = targetWorld.getDefaultLayer();
         }
 
+        // If LeftAlt is pressed, handle creating the alignment grid.
+        if(Input.GetKeyDown(KeyCode.LeftAlt))
+        {
+            if (!alignmentGridLock)
+            {
+                alignmentGrid.SetActive(true);
+                alignmentGrid.transform.position = placementGrid.transform.position;
+                alignmentGridScale = 1;
+                alignmentGridHeightChange = 0;
+                foreach (GameObject handle in runtimeHandles)
+                {
+                    handle.GetComponent<RuntimeHandle>().TranslationSnapping = 0f;
+                }
+            }
+
+            alignmentGridLock = false;
+            alignmentGrid.GetComponent<Renderer>().material.SetColor("_LineColor", new Color(1f, 1f, 0f, 0f));
+        }
+
+        if (Input.GetKeyUp(KeyCode.LeftAlt))
+        {
+            if(!alignmentGridLock)
+            {
+                alignmentGrid.SetActive(false);
+            }
+        }
+
+        if (Input.GetKey(KeyCode.LeftAlt))
+        {
+            if(Input.mouseScrollDelta.y > 0)
+            {
+                alignmentGridScale++;
+                alignmentGrid.transform.position = placementGrid.transform.position + new Vector3(0, (float)alignmentGridHeightChange / (float)alignmentGridScale, 0);
+            } else if(Input.mouseScrollDelta.y < 0)
+            {
+                alignmentGridScale--;
+                if(alignmentGridScale < 1)
+                {
+                    alignmentGridScale = 1;
+                }
+                alignmentGrid.transform.position = placementGrid.transform.position + new Vector3(0, (float)alignmentGridHeightChange / (float)alignmentGridScale, 0);
+            }
+
+            if (Input.GetKeyDown(KeyCode.PageUp))
+            {
+                alignmentGridHeightChange++;
+                alignmentGrid.transform.DOMove(placementGrid.transform.position + new Vector3(0, (float)alignmentGridHeightChange / (float)alignmentGridScale, 0), tweenTime);
+            }
+                
+
+            if (Input.GetKeyDown(KeyCode.PageDown))
+            {
+                alignmentGridHeightChange--;
+                alignmentGrid.transform.DOMove(placementGrid.transform.position + new Vector3(0, (float)alignmentGridHeightChange / (float)alignmentGridScale, 0), tweenTime);
+            }
+
+            alignmentGrid.GetComponent<Renderer>().material.SetFloat("_GridXYSize", 1000 * alignmentGridScale);
+            alignmentGrid.GetComponent<Renderer>().material.SetFloat("_LineWidth", alignmentGridLineWidthMultiplier * alignmentGridScale);
+
+            if(Input.GetKeyDown(KeyCode.S))
+            {
+                alignmentGridLock = true;
+                alignmentGrid.GetComponent<Renderer>().material.SetColor("_LineColor", new Color(0f, 1f, 0f, 0f));
+            }
+
+            foreach(GameObject handle in runtimeHandles)
+            {
+                handle.GetComponent<RuntimeHandle>().TranslationSnapping = 1f / (float)alignmentGridScale;
+            }
+
+            return;
+        }
+
+
 
         // If no tile is slated for placement, handle selecting objects instead
         if (selectedTile == null) { handleObjectSelection(); return; }
 
-
+        
 
         // Create ray from camera to mouse
         Ray ray = placementCamera.ScreenPointToRay(Input.mousePosition);

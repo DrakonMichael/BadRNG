@@ -68,7 +68,6 @@ public class Actor : BRNGScript
 
     [BRNGServerExecutable]
     [InteractionSetPermission(PermissionLevel.Player)]
-    [InteractionDeferExecution]
     public void MoveServer(InteractionServerData data)
     {
         Vector3 moveTo = data.decodeAs<Vector3>("position");
