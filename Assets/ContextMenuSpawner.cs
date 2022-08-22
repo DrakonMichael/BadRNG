@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using System;
 
 public static class RectTransformExtensions
 {
@@ -34,6 +35,7 @@ public class ContextMenuSpawner : MonoBehaviour
     public GameObject interactionButtonPrefab;
 
     private Camera playerCamera;
+    private bool useWorldSpace = false;
     private Vector3 worldSpaceMove;
 
     public void RemoveContextMenu()
@@ -44,6 +46,30 @@ public class ContextMenuSpawner : MonoBehaviour
         }
     }
 
+    public void SpawnBasicContextMenu2D(string menuName, Dictionary<string, Action> buttons, Vector2 position)
+    {
+        if(buttons.Keys.Count <= 0) { return; }
+        RemoveContextMenu();
+        GameObject newContextMenu = GameObject.Instantiate(contextMenuPrefab);
+        newContextMenu.transform.SetParent(this.transform);
+        newContextMenu.GetComponent<RectTransform>().anchoredPosition = new Vector3(50, -50, 0);
+        newContextMenu.transform.Find("ObjectName").GetComponent<TextMeshProUGUI>().text = menuName;
+        foreach (string buttonText in buttons.Keys)
+        {
+            GameObject newButton = GameObject.Instantiate(interactionButtonPrefab);
+            newButton.transform.SetParent(newContextMenu.transform);
+            newButton.transform.GetComponentInChildren<TextMeshProUGUI>().text = buttonText;
+            newButton.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                buttons[buttonText]();
+                RemoveContextMenu();
+            });
+
+        }
+        newContextMenu.GetComponent<RectTransform>().sizeDelta = new Vector2(150, 0);
+        transform.position = Input.mousePosition;
+        useWorldSpace = false;
+    }
     public void SpawnContextMenu(string menuName, List<BRNGInteractionData> interactions, BRNGPlayerData playerData, Vector3 worldSpaceLocation)
     {
         worldSpaceMove = worldSpaceLocation;
@@ -115,7 +141,7 @@ public class ContextMenuSpawner : MonoBehaviour
         }
 
         newContextMenu.GetComponent<RectTransform>().sizeDelta = new Vector2(150, trackedYSize);
-
+        useWorldSpace = true;
         transform.position = Input.mousePosition;
     }
 
@@ -126,6 +152,10 @@ public class ContextMenuSpawner : MonoBehaviour
 
     private void Update()
     {
-        transform.position = playerCamera.WorldToScreenPoint(worldSpaceMove);
+        if(useWorldSpace)
+        {
+            transform.position = playerCamera.WorldToScreenPoint(worldSpaceMove);
+        }
+        
     }
 }

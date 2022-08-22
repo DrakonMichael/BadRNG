@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8289419140925964047}
   - component: {fileID: 920973746458915424}
+  - component: {fileID: 942349239255687560}
   m_Layer: 0
   m_Name: editorLayer
   m_TagString: Untagged
@@ -45,3 +46,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   index: 0
+  layerName: 
+  visibleToServer: 0
+--- !u!114 &942349239255687560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5911253487692209539}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sceneId: 0
+  serverOnly: 0
+  visible: 0
+  m_AssetId: 70a1ab10ccc06504489d30d993a7adc5
+  hasSpawned: 0

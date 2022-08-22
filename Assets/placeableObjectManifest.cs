@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
 [System.Serializable]
 public enum placeableObjectType { 
@@ -18,14 +19,13 @@ public enum SourceType
     workshopAsset
 }
 
-public class placeableObjectManifest : MonoBehaviour
+public class placeableObjectManifest : NetworkBehaviour
 {
     public string tileDisplayName;
     public placeableObjectType objectType;
     public bool rotationAgnostic;
     public string assetID;
     public SourceType sourceLocation;
-    
 
     /**
      * For 'baseAsset' - Not used
@@ -33,4 +33,5 @@ public class placeableObjectManifest : MonoBehaviour
      * For 'workshopAsset' - the workshop ID.
      */
     public string sourceData;
+
 }

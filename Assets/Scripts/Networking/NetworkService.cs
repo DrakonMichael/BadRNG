@@ -5,7 +5,7 @@ using Mirror;
 
 public class NetworkService : NetworkManager
 {
-
+    public LayerHandler layerPrefab;
 
     public override void OnClientConnect()
     {
@@ -28,6 +28,8 @@ public class NetworkService : NetworkManager
                 NetworkClient.RegisterPrefab(prefab);
             }
         }
+
+        NetworkClient.RegisterPrefab(layerPrefab.gameObject);
 
         base.OnClientConnect();
     }

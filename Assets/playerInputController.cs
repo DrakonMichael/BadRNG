@@ -22,7 +22,7 @@ public class playerInputController : NetworkBehaviour
     {
 
         GameObject utility = GameObject.FindGameObjectWithTag("Interaction Service");
-        List<BRNGInteractionData> interactions = utility.GetComponent<InteractionService>().GenerateInteractionData(target);
+        List<BRNGInteractionData> interactions = interactionService.GenerateInteractionData(target);
 
         foreach(BRNGInteractionData interaction in interactions)
         {
@@ -32,7 +32,7 @@ public class playerInputController : NetworkBehaviour
                 BRNGPlayer serverPlayer = utility.GetComponent<PlayerService>().getPlayerByConnection(connectionToClient);
                 if(serverPlayer.playerData.permissions >= interaction.ActionPermissionLevel)
                 {
-                    interaction.functionCallback();
+                    interaction.ServerOnlyFunctionCallback(connectionToClient);
                 }
 
                 break;
@@ -42,8 +42,15 @@ public class playerInputController : NetworkBehaviour
 
     }
 
+    [Command]
+    public void CmdGetNetworkHeirarchyPersistenceData()
+    {
+        interactionService.world.SendNetworkHeirarchyPersistenceData(connectionToClient);
+    }
+
     public void TryServerExecution(string executionName, InteractionServerData passData) {
         passData.serialize();
+        
         CmdTryExecution(executionName, passData);
     }
 
@@ -51,9 +58,8 @@ public class playerInputController : NetworkBehaviour
     private void CmdTryExecution(string executionName, InteractionServerData passData)
     {
         passData.deserialize();
-
         GameObject utility = GameObject.FindGameObjectWithTag("Interaction Service");
-        List<BRNGExecutionData> functions = utility.GetComponent<InteractionService>().GenerateExecutableData(passData.target);
+        List<BRNGExecutionData> functions = interactionService.GenerateExecutableData(passData.target);
 
         foreach (BRNGExecutionData interaction in functions)
         {
@@ -69,7 +75,16 @@ public class playerInputController : NetworkBehaviour
                 break;
             }
         }
+    }
 
-
+    private void Start()
+    {
+        GameObject utility = GameObject.FindGameObjectWithTag("Interaction Service");
+        interactionService = utility.GetComponent<InteractionService>();
+        if(isLocalPlayer)
+        {
+            CmdGetNetworkHeirarchyPersistenceData();
+        }
+        
     }
 }

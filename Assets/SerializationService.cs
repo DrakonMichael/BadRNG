@@ -8,23 +8,29 @@ public class SerializationService : NetworkBehaviour
 {
     public LayerHandler LayerPrefab;
 
-
     #region Helper Serialization Classes
     /* -------------------- BEGIN SERIALIZABLE HELPER CLASSES -------------------- */
 
     [System.Serializable]
-    private class SerializedScript
+    public class SerializedScript
     {
         public string fullScriptTypename;
         public string serializedScriptData;
     }
 
     [System.Serializable]
-    private class SerializableTransform
+    public class SerializableTransform
     {
         public Vector3 position;
         public Quaternion rotation;
         public Vector3 localScale;
+
+        public SerializableTransform()
+        {
+            position = new Vector3(0, 0, 0);
+            rotation = Quaternion.Euler(0, 0, 0);
+            localScale = new Vector3(0, 0, 0);
+        }
 
         public SerializableTransform(Transform other) {
             position = other.position;
@@ -41,7 +47,7 @@ public class SerializationService : NetworkBehaviour
     }
 
     [System.Serializable]
-    private class SerializedObject
+    public class SerializedObject
     {
         public string assetID;
         public SerializableTransform transform;
@@ -50,12 +56,14 @@ public class SerializationService : NetworkBehaviour
     }
 
     [System.Serializable]
-    private class SerializedLayer {
+    public class SerializedLayer {
         public List<SerializedObject> placeableObjects;
         public string layerName;
         public int index;
+        public bool visibleToServer;
         public SerializableTransform transform;
     }
+
 
     [System.Serializable]
     public class WorldData
@@ -68,7 +76,7 @@ public class SerializationService : NetworkBehaviour
     }
 
     [System.Serializable]
-    private class SerializedWorld
+    public class SerializedWorld
     {
         public List<SerializedLayer> layers;
         public WorldData metaData;
@@ -126,6 +134,7 @@ public class SerializationService : NetworkBehaviour
         SerializedLayer serializedLayer = new SerializedLayer();
         serializedLayer.index = layer.index;
         serializedLayer.layerName = layer.layerName;
+        serializedLayer.visibleToServer = layer.visibleToServer;
         serializedLayer.placeableObjects = new List<SerializedObject>();
         serializedLayer.placeableObjects = RecursiveObjectSerialize(layer.gameObject);
         serializedLayer.transform = new SerializableTransform(layer.transform);
@@ -153,6 +162,16 @@ public class SerializationService : NetworkBehaviour
     #region Deserialization Code
     /* -------------------- BEGIN DESERIALIZATION CODE -------------------- */
 
+    [ClientRpc]
+    private void RpcSetupObjectTransform(GameObject networkedObject, GameObject parentObject, Vector3 pos, Quaternion rot, Vector3 scale)
+    {
+        networkedObject.transform.SetParent(parentObject.transform);
+        networkedObject.transform.position = pos;
+        networkedObject.transform.rotation = rot;
+        networkedObject.transform.localScale = scale;
+    }
+
+
     private void RecursiveDeserializeObjects(GameObject parent, List<SerializedObject> childrenToDeserialize)
     {
         if (!isServer) { return; }
@@ -163,8 +182,6 @@ public class SerializationService : NetworkBehaviour
                 if (manifest.assetID == serializedObject.assetID)
                 {
                     GameObject newObject = Instantiate(manifest.gameObject);
-                    newObject.transform.SetParent(parent.transform);
-                    serializedObject.transform.assignTransform(newObject.transform);
                     newObject.transform.name = newObject.transform.name.Replace("(Clone)", "").Trim();
 
                     // script deserialization
@@ -175,6 +192,7 @@ public class SerializationService : NetworkBehaviour
                     }
 
                     NetworkServer.Spawn(newObject);
+                    RpcSetupObjectTransform(newObject, parent, serializedObject.transform.position, serializedObject.transform.rotation, serializedObject.transform.localScale);
                     RecursiveDeserializeObjects(newObject, serializedObject.children);
                 }
             }
@@ -182,6 +200,15 @@ public class SerializationService : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    private void RpcUpdateLayers(GameObject Layer, SerializedLayer layerInfo)
+    {
+        Layer.GetComponent<LayerHandler>().index = layerInfo.index;
+        Layer.GetComponent<LayerHandler>().layerName = layerInfo.layerName;
+        Layer.GetComponent<LayerHandler>().visibleToServer = layerInfo.visibleToServer;
+    }
+
+    [Server]
     public void DeserializeWorld(string serializedWorldData, worldManager toWorld)
     {
         // Removes all children and descendants of the existing world to clear it for deserialization.
@@ -192,17 +219,30 @@ public class SerializationService : NetworkBehaviour
         }
 
         SerializedWorld world = JsonUtility.FromJson<SerializedWorld>(serializedWorldData);
-        foreach(SerializedLayer layer in world.layers)
+        this.GetComponent<worldManager>().removeAllLayers();
+        foreach (SerializedLayer layer in world.layers)
         {
             GameObject newLayer = GameObject.Instantiate(LayerPrefab.gameObject);
-            newLayer.transform.SetParent(toWorld.transform);
-            layer.transform.assignTransform(newLayer.transform);
             LayerHandler newLayerHandler = newLayer.GetComponent<LayerHandler>();
             newLayerHandler.index = layer.index;
             newLayerHandler.layerName = layer.layerName;
+            newLayerHandler.visibleToServer = layer.visibleToServer;
+            this.GetComponent<worldManager>().addLayer(newLayerHandler);
+            NetworkServer.Spawn(newLayer);
+            newLayer.transform.SetParent(toWorld.transform);
+
+            RpcSetupObjectTransform(newLayer, toWorld.gameObject, layer.transform.position, layer.transform.rotation, layer.transform.localScale);
+            RpcUpdateLayers(newLayer, layer);
             RecursiveDeserializeObjects(newLayer, layer.placeableObjects);
         }
         toWorld.meta = world.metaData;
+
+        
+        foreach(BRNGScript script in toWorld.getDefaultLayer().GetComponentsInChildren<BRNGScript>(true))
+        {
+            Debug.Log(script.GetType().Name);
+            script.onDeserialization();
+        }
 
     }
 

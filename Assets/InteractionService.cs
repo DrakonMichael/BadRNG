@@ -60,6 +60,7 @@ public class BRNGInteractionData
     public bool isServerOnly;
 
     public Action interactionExecutionFunction;
+    public Action<NetworkConnection> ServerOnlyFunctionCallback;
     public Action functionCallback;
 
     public bool canBeRunBy(BRNGPlayerData player)
@@ -70,6 +71,38 @@ public class BRNGInteractionData
 
 #endregion
 
+#region Nullable Serialization
+
+[System.Serializable]
+public class BNullable<T>
+{
+    public T value;
+    public string typeString;
+}
+
+public class BNullableInteger : BNullable<int>
+{
+    public BNullableInteger(int i)
+    {
+        typeString = typeof(int).FullName;
+        value = i;
+    }
+}
+
+public class BNullableString : BNullable<string>
+{
+    public BNullableString(string s)
+    {
+        typeString = typeof(string).FullName;
+        value = s;
+    }
+}
+
+
+
+#endregion
+
+#region Interaction Classes
 [System.Serializable]
 public class InteractionServerData
 {
@@ -138,6 +171,16 @@ public class InteractionServerData
 
     public void encode(object dataToEncode, string encodeAsKey)
     {
+        if (dataToEncode.GetType() == typeof(int))
+        {
+            dataToEncode = new BNullableInteger((int)dataToEncode);
+        }
+
+        if (dataToEncode.GetType() == typeof(string))
+        {
+            dataToEncode = new BNullableString((string)dataToEncode);
+        }
+
         fastAccess.Add(encodeAsKey, JsonUtility.ToJson(dataToEncode));
     }
 
@@ -146,11 +189,26 @@ public class InteractionServerData
         return fastAccess[key];
     }
 
+    public int decodeInt(string key)
+    {
+        BNullableInteger nInt = JsonUtility.FromJson<BNullableInteger>(fastAccess[key]);
+        return nInt.value;
+    }
+
+    public string decodeString(string key)
+    {
+        BNullableString nInt = JsonUtility.FromJson<BNullableString>(fastAccess[key]);
+        return nInt.value;
+    }
+
     public T decodeAs<T>(string key)
     {
         return JsonUtility.FromJson<T>(fastAccess[key]);
     }
 }
+
+#endregion
+
 
 public class InteractionService : NetworkBehaviour
 {
@@ -228,6 +286,18 @@ public class InteractionService : NetworkBehaviour
         newData.InteractionGroup = script.GetType().ToString();
 
         newData.functionCallback = () => { methodInfo.Invoke(script, new object[0]); };
+        newData.ServerOnlyFunctionCallback = (NetworkConnection conn) =>
+        {
+            object[] parameters = new object[1];
+            parameters[0] = conn;
+            try
+            {
+                methodInfo.Invoke(script, parameters);
+            } catch (TargetInvocationException err)
+            {
+                Debug.Log(err.InnerException);
+            }
+        };
         newData.interactionExecutionFunction = newData.functionCallback;
         newData.ActionPermissionLevel = PermissionLevel.Host;
 
@@ -357,11 +427,14 @@ public class InteractionService : NetworkBehaviour
     [Space]
     [Header("Interaction Continuation")]
     [SerializeField] private GameObject ICWalkablePrefab;
+    [SerializeField] private GameObject ICLayerChangePrefab;
+    [SerializeField] private GameObject ICRuntimeHandlePrefab;
+    [SerializeField] private GameObject ICSelectWithScriptPrefab;
 
     List<Action> InteractionStopFunctions;
 
 
-
+    #region ICExecute
     public void ICExecute(GameObject target, string methodName, InteractionServerData ServerData)
     {
         ServerData.target = target;
@@ -424,13 +497,14 @@ public class InteractionService : NetworkBehaviour
 
         
     }
-
+    #endregion
     public void StopAllInteractions()
     {
         foreach(Action a in InteractionStopFunctions) { a(); }
     }
 
-    public void ICGroundPosition(Action<Vector3> callback)
+    #region IC Ground Position
+    public IEnumerator ICGroundPosition(Action<Vector3> callback)
     {
         IEnumerator yieldingFunction(Action<Vector3> cb)
         {
@@ -473,7 +547,212 @@ public class InteractionService : NetworkBehaviour
 
         // For Cleanup
         InteractionStopFunctions.Add(() => { StopCoroutine(coroutine); });
+        return coroutine;
     }
+    #endregion
+
+    #region IC Change Layer
+    public IEnumerator ICChangeLayer(LayerHandler fromLayer, Action<LayerHandler, Vector3> callback)
+    {
+        IEnumerator yieldingFunction(LayerHandler from, Action<LayerHandler, Vector3> cb)
+        {
+            GameObject newPosIndicator = GameObject.Instantiate(ICLayerChangePrefab);
+            newPosIndicator.SetActive(false);
+            bool runLoop = true;
+            while (runLoop)
+            {
+                Ray ray = localcamera.ScreenPointToRay(Input.mousePosition);
+
+                PhysicsRaycast(99, ray, (hit) =>
+                {
+                    LayerHandler layerHit = hit.transform.GetComponentInParent<LayerHandler>();
+                    if (layerHit && from.index != layerHit.index)
+                    {
+                        if (newPosIndicator != null)
+                        {
+                            newPosIndicator.SetActive(true);
+                            newPosIndicator.transform.position = hit.point;
+                            if (Input.GetMouseButtonDown(0))
+                            {
+                                
+                                Destroy(newPosIndicator);
+                                cb(layerHit, hit.point);
+                                runLoop = false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (newPosIndicator != null)
+                            newPosIndicator.SetActive(false);
+                    }
+
+                });
+                yield return new WaitForEndOfFrame();
+            }
+        }
+        IEnumerator coroutine = yieldingFunction(fromLayer, callback);
+        StartCoroutine(coroutine);
+
+        // For Cleanup
+        InteractionStopFunctions.Add(() => { StopCoroutine(coroutine); });
+        return coroutine;
+    }
+    #endregion
+
+    #region IC Runtime Handle
+    public IEnumerator ICRuntimeHandle(Transform target, bool tileRestricted)
+    {
+        IEnumerator yieldingFunction(Transform t, bool TR)
+        {
+            GameObject newHandle = Instantiate(ICRuntimeHandlePrefab, target.position, target.rotation);
+            //newHandle.transform.localScale = Vector3.zero;
+            RuntimeHandle h = newHandle.GetComponent<RuntimeHandle>();
+            h.target = target;
+
+            if(TR)
+            {
+                h.ScaleMode = RuntimeHandleMode.None;
+                h.TranslationMode = RuntimeHandleMode.XYZ;
+                h.RotationMode = RuntimeHandleMode.Y;
+                h.TranslationSnapping = 1;
+                h.RotationSnapping = 90;
+            }
+
+
+            bool runLoop = true;
+            while (runLoop)
+            {
+                if(Input.GetKey(KeyCode.Escape))
+                {
+                    Debug.Log("Destroy");
+                    Destroy(newHandle);
+                    runLoop = false;
+                }
+                yield return new WaitForEndOfFrame();
+            }
+        }
+        IEnumerator coroutine = yieldingFunction(target, tileRestricted);
+        StartCoroutine(coroutine);
+
+        
+        // For Cleanup
+        InteractionStopFunctions.Add(() => { StopCoroutine(coroutine); });
+
+        return coroutine;
+    }
+    
+    public void ICRuntimeHandle(Transform target)
+    {
+        ICRuntimeHandle(target, false);
+    }
+    #endregion
+
+    #region IC Select With Script
+
+    private class ScriptSelectObjectIndicator
+    {
+        public GameObject indicator;
+        public GameObject target;
+        public GameObject brightIndicator;
+        public GameObject dimIndicator;
+    }
+
+    public IEnumerator ICGetObjectWithScript(Type scriptType, Action<GameObject> callback)
+    {
+        IEnumerator yieldingFunction(Type st, Action<GameObject> cb)
+        {
+            List<ScriptSelectObjectIndicator> objectIndicators = new List<ScriptSelectObjectIndicator>();
+                
+            foreach(BRNGScript script in world.GetComponentsInChildren<BRNGScript>())
+            {
+                if(script.GetType() == scriptType)
+                {
+                    ScriptSelectObjectIndicator indicatorObject = new ScriptSelectObjectIndicator();
+                    GameObject indicator = GameObject.Instantiate(ICSelectWithScriptPrefab);
+                    indicator.transform.position = script.gameObject.transform.position;
+                    indicatorObject.indicator = indicator;
+                    indicatorObject.target = script.gameObject;
+                    indicatorObject.brightIndicator = indicator.transform.Find("SelectionBright").gameObject;
+                    indicatorObject.dimIndicator = indicator.transform.Find("SelectionDim").gameObject;
+                    indicatorObject.brightIndicator.SetActive(false);
+                    objectIndicators.Add(indicatorObject);
+                }
+            }
+
+            bool runLoop = true;
+            while (runLoop)
+            {
+                Ray ray = localcamera.ScreenPointToRay(Input.mousePosition);
+
+                
+                PhysicsRaycast(99, ray, (hit) =>
+                {
+                    placeableObjectManifest hitObj = hit.transform.GetComponent<placeableObjectManifest>();
+                    if (hitObj)
+                    {
+                        bool found = false;
+                        foreach(BRNGScript script in hitObj.transform.GetComponents<BRNGScript>())
+                        {
+                            if(script.GetType() == st)
+                            {
+                                foreach(ScriptSelectObjectIndicator ssoi in objectIndicators)
+                                {
+                                    if(ssoi.target == hitObj.gameObject)
+                                    {
+                                        found = true;
+                                        ssoi.dimIndicator.SetActive(false);
+                                        ssoi.brightIndicator.SetActive(true);
+                                    } else
+                                    {
+                                        ssoi.dimIndicator.SetActive(true);
+                                        ssoi.brightIndicator.SetActive(false);
+                                    }
+                                }
+
+                                if(Input.GetMouseButton(0))
+                                {
+                                    runLoop = false;
+                                    cb(hitObj.gameObject);
+                                }
+                            }
+                        }
+
+                        if(!found)
+                        {
+                            foreach (ScriptSelectObjectIndicator ssoi in objectIndicators)
+                            {
+                                ssoi.dimIndicator.SetActive(true);
+                                ssoi.brightIndicator.SetActive(false);
+                            }
+                        }
+                    } else
+                    {
+                        foreach (ScriptSelectObjectIndicator ssoi in objectIndicators)
+                        {
+                            ssoi.dimIndicator.SetActive(true);
+                            ssoi.brightIndicator.SetActive(false);
+                        }
+                    }
+                });
+                
+                yield return new WaitForEndOfFrame();
+            }
+
+            foreach (ScriptSelectObjectIndicator ssoi in objectIndicators)
+            {
+                Destroy(ssoi.indicator);
+            }
+
+        }
+        IEnumerator coroutine = yieldingFunction(scriptType, callback);
+        StartCoroutine(coroutine);
+
+        // For Cleanup
+        InteractionStopFunctions.Add(() => { StopCoroutine(coroutine); });
+        return coroutine;
+    }
+    #endregion
 
     #endregion
 

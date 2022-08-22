@@ -44,6 +44,15 @@ public class PlayerService : NetworkBehaviour
         return null;
     }
 
+    public BRNGPlayer getPlayerByConnID(int conn)
+    {
+        foreach (BRNGPlayer p in players)
+        {
+            if (p.playerData.connectionID == conn) { return p; }
+        }
+        return null;
+    }
+
     public BRNGPlayer getPlayerByUID(int uid)
     {
         foreach (BRNGPlayer p in players)
@@ -107,6 +116,8 @@ public class PlayerService : NetworkBehaviour
         newPlayer.transform.SetParent(placementWorld.getDefaultLayer().transform);
         newPlayer.transform.position = new Vector3(0, 0, 0);
         NetworkServer.Spawn(newPlayer);
+
+        placementWorld.hideAllLayersBut(player, placementWorld.getDefaultLayer());
     }
 
     #endregion

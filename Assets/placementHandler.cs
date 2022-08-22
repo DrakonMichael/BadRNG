@@ -47,6 +47,14 @@ public class placementHandler : NetworkBehaviour
     private Camera placementCamera;
     private List<GameObject> runtimeHandles;
 
+    [Space]
+    [Header("Network Editing")]
+    [SerializeField]
+    private float tilePositionUpdateRate;
+    private float tilePosUpdateSecondsElapsed;
+
+    
+
     private void Start()
     {
         if(!isServer) { return; }
@@ -79,7 +87,12 @@ public class placementHandler : NetworkBehaviour
         placementGrid.transform.GetChild(0).transform.DOMove(layer.transform.position, tweenTime);
     }
 
-    
+    public void resetGridPosition()
+    {
+        if (!isServer) { return; }
+        placementGrid.transform.position = targetLayer.transform.position;
+        setPlane(targetLayer, layerVerticalOffset);
+    }
 
     public void changeLayerSelection(LayerHandler layer)
     {
@@ -112,6 +125,14 @@ public class placementHandler : NetworkBehaviour
         loadNewSelector();
     }
 
+    [ClientRpc]
+    private void RpcSetNewObjectTransform(GameObject networkedPlaceableObject, Vector3 pos, Quaternion rot, Vector3 scale)
+    {
+        networkedPlaceableObject.transform.position = pos;
+        networkedPlaceableObject.transform.rotation = rot;
+        networkedPlaceableObject.transform.localScale = scale;
+    }
+
     public void loadNewSelector()
     {
         clearFocusTile();
@@ -140,6 +161,9 @@ public class placementHandler : NetworkBehaviour
         {
             foreach (GameObject o in runtimeHandles)
             {
+                RuntimeHandle handle = o.GetComponent<RuntimeHandle>();
+                RpcSetNewObjectTransform(handle.target.gameObject, handle.target.position, handle.target.rotation, handle.target.localScale);
+
                 Destroy(o);
             }
         }
@@ -207,6 +231,23 @@ public class placementHandler : NetworkBehaviour
     private void Update()
     {
         if(!isServer) { return; }
+
+        tilePosUpdateSecondsElapsed += Time.deltaTime;
+        if (tilePosUpdateSecondsElapsed > tilePositionUpdateRate)
+        {
+            foreach (GameObject o in runtimeHandles)
+            {
+                RuntimeHandle handle = o.GetComponent<RuntimeHandle>();
+                if(handle.target.gameObject != null)
+                {
+                    RpcSetNewObjectTransform(handle.target.gameObject, handle.target.position, handle.target.rotation, handle.target.localScale);
+                }
+                
+            }
+            tilePosUpdateSecondsElapsed = 0;
+        }
+        
+
         if(modeController.getActiveMode() != "placement") { return; }
 
         if(!placementCamera)
@@ -219,6 +260,8 @@ public class placementHandler : NetworkBehaviour
             targetLayer = targetWorld.getDefaultLayer();
         }
 
+        resetGridPosition();
+
         // If LeftAlt is pressed, handle creating the alignment grid.
         if(Input.GetKeyDown(KeyCode.LeftAlt))
         {
@@ -228,10 +271,6 @@ public class placementHandler : NetworkBehaviour
                 alignmentGrid.transform.position = placementGrid.transform.position;
                 alignmentGridScale = 1;
                 alignmentGridHeightChange = 0;
-                foreach (GameObject handle in runtimeHandles)
-                {
-                    handle.GetComponent<RuntimeHandle>().TranslationSnapping = 0f;
-                }
             }
 
             alignmentGridLock = false;
@@ -243,6 +282,10 @@ public class placementHandler : NetworkBehaviour
             if(!alignmentGridLock)
             {
                 alignmentGrid.SetActive(false);
+                foreach (GameObject handle in runtimeHandles)
+                {
+                    handle.GetComponent<RuntimeHandle>().TranslationSnapping = 0f;
+                }
             }
         }
 

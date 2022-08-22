@@ -94,7 +94,7 @@ GameObject:
   - component: {fileID: 1907897011857478696}
   - component: {fileID: 1307994254793400975}
   - component: {fileID: 8518084732230905876}
-  - component: {fileID: -5804982425559853553}
+  - component: {fileID: -3645340547640496914}
   m_Layer: 0
   m_Name: Barrel
   m_TagString: Untagged
@@ -150,7 +150,7 @@ MonoBehaviour:
   assetID: test_prop_brrel
   sourceLocation: 0
   sourceData: 
---- !u!114 &-5804982425559853553
+--- !u!114 &-3645340547640496914
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

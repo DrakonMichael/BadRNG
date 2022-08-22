@@ -9,6 +9,7 @@ TagManager:
   - Network Manager
   - Interaction Service
   - LocalPlayer
+  - World
   layers:
   - Default
   - TransparentFX

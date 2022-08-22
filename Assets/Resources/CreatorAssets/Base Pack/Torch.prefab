@@ -126,7 +126,7 @@ GameObject:
   - component: {fileID: 29384633418011140}
   - component: {fileID: 1415181904560640225}
   - component: {fileID: 8820224878007675633}
-  - component: {fileID: 2149348312149900655}
+  - component: {fileID: -4299571808695837247}
   m_Layer: 0
   m_Name: Torch
   m_TagString: Untagged
@@ -182,7 +182,7 @@ MonoBehaviour:
   assetID: test_wtorch_fixed
   sourceLocation: 0
   sourceData: 
---- !u!114 &2149348312149900655
+--- !u!114 &-4299571808695837247
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

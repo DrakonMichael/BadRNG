@@ -13,7 +13,6 @@ public class Actor : BRNGScript
     private GameObject ownershipIndicator;
 
     [System.NonSerialized] private int savedOwnerID = -1;
-    [System.NonSerialized] private InteractionService interactionService;
 
 
     private void Start()
@@ -87,10 +86,52 @@ public class Actor : BRNGScript
         });
     }
 
+    [BRNGServerExecutable]
+    [InteractionSetPermission(PermissionLevel.Player)]
+    public void ChangeLayerServer(InteractionServerData data)
+    {
+        int layerIndex = data.decodeInt("index");
+        worldManager world = GameObject.FindGameObjectWithTag("World").GetComponent<worldManager>();
+        if (world.getLayer(layerIndex) != null)
+        {
+            Vector3 moveTo = data.decodeAs<Vector3>("position");
+            transform.position = moveTo;
+            this.transform.SetParent(world.getLayer(layerIndex).transform);
+            RpcPropogateChangeLayer(world.getLayer(layerIndex).gameObject, moveTo);
+
+            GameObject utility = GameObject.FindGameObjectWithTag("Interaction Service");
+            PlayerService ps = utility.GetComponent<PlayerService>();
+
+            world.hideAllLayersBut(ps.getPlayerByConnID(ownerID), world.getLayer(layerIndex));
+            
+        }
+    }
+
+    [ClientRpc]
+    private void RpcPropogateChangeLayer(GameObject layer, Vector3 pos)
+    {
+        transform.position = pos;
+        this.transform.SetParent(layer.transform);
+    }
+
+    [BRNGInteraction]
+    [InteractionSetPermission(PermissionLevel.Moderator)]
+    public void ChangeLayer()
+    {
+        InteractionServerData data = new InteractionServerData();
+        interactionService.ICChangeLayer(this.transform.GetComponentInParent<LayerHandler>(), (LayerHandler layer, Vector3 pos) =>
+        {
+            data.encode(layer.index, "index");
+            data.encode(pos, "position");
+            interactionService.ICExecute(this.gameObject, nameof(ChangeLayerServer), data);
+        }
+        );
+    }
+
     [BRNGInteraction]
     [InteractionSetPermission(PermissionLevel.Administrator)]
     [Server]
-    public void Delete()
+    public void Delete(NetworkConnection client)
     {
         Destroy(this.gameObject);
     }
